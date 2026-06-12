@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Startup • Marketplace Automation</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
+
+    :root {
+      --bg: #020617;
+      --panel: #0f172a;
+      --panel-2: #1e2937;
+      --border: #334155;
+      --accent: #6366f1;
+      --accent-2: #a855f7;
+      --text: #f1f5f9;
+      --muted: #64748b;
+      --success: #22c55e;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: 'Inter', system_ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      user-select: none;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .dialog {
+      width: 420px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.4);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      -webkit-app-region: drag;
+      padding: 18px 22px 14px;
+      background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 700;
+      color: white;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.15);
+    }
+
+    .header-text h1 {
+      margin: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+
+    .header-text p {
+      margin: 1px 0 0;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .content {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .choice-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .choice {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .choice:hover {
+      border-color: #475569;
+    }
+
+    .choice.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+      background: #0f172a;
+    }
+
+    .choice input {
+      accent-color: var(--accent);
+      width: 16px;
+      height: 16px;
+      margin: 0;
+    }
+
+    .choice-label {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .choice-hint {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .actions {
+      padding: 0 22px 22px;
+    }
+
+    .launch-btn {
+      width: 100%;
+      height: 48px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -.2px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform .1s ease, box-shadow .1s ease;
+      box-shadow: 0 10px 15px -3px rgb(99 102 241 / 0.3);
+    }
+
+    .launch-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 15px 20px -4px rgb(99 102 241 / 0.35);
+    }
+
+    .launch-btn:active {
+      transform: scale(0.985);
+    }
+
+    .launch-btn:disabled {
+      opacity: 0.7;
+      cursor: default;
+      transform: none;
+    }
+
+    .footer {
+      padding: 0 22px 18px;
+      font-size: 10px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.3;
+    }
+
+    .note {
+      font-size: 11px;
+      color: var(--muted);
+      background: #020617;
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      border-radius: 8px;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="dialog">
+    <!-- Draggable header -->
+    <div class="header">
+      <div class="logo">YA</div>
+      <div class="header-text">
+        <h1>Startup Configuration</h1>
+        <p>Yosh Studios • FB Marketplace Automation</p>
+      </div>
+    </div>
+
+    <div class="content">
+      <div>
+        <div class="section-title">Dedicated Bot Chrome</div>
+        <div class="choice-group">
+          <label class="choice selected" id="chrome-visible-label">
+            <input type="radio" name="chrome" value="visible" id="chrome-visible" checked>
+            <div>
+              <div class="choice-label">Visible</div>
+              <div class="choice-hint">Window shows on screen</div>
+            </div>
+          </label>
+          <label class="choice" id="chrome-hidden-label">
+            <input type="radio" name="chrome" value="hidden" id="chrome-hidden">
+            <div>
+              <div class="choice-label">Hidden</div>
+              <div class="choice-hint">Stealth / background</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">Terminal / Console Window</div>
+        <div class="choice-group">
+          <label class="choice selected" id="terminal-visible-label">
+            <input type="radio" name="terminal" value="visible" id="terminal-visible" checked>
+            <div>
+              <div class="choice-label">Visible</div>
+              <div class="choice-hint">Show PowerShell / cmd logs</div>
+            </div>
+          </label>
+          <label class="choice" id="terminal-hidden-label">
+            <input type="radio" name="terminal" value="hidden" id="terminal-hidden">
+            <div>
+              <div class="choice-label">Hidden</div>
+              <div class="choice-hint">Clean, no terminal</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="note">
+        These choices are applied once when the bot starts. The dedicated Chrome uses your saved Facebook login (profile). Hidden mode is recommended for long unattended runs.
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="launch-btn" class="launch-btn">
+        <span>Launch Automation Studio</span>
+      </button>
+    </div>
+
+    <div class="footer">
+      Your selections control the exact flags passed to Chrome and the console.<br>
+      No code changes or .ps1 edits needed for different machines.
+    </div>
+  </div>
+
+  <script>
+    // Make choice cards visually selected when radio changes
+    function setupChoiceGroup(name) {
+      const radios = document.querySelectorAll(`input[name="${name}"]`);
+      radios.forEach(radio => {
+        const label = radio.closest('.choice');
+        const update = () => {
+          document.querySelectorAll(`input[name="${name}"]`).forEach(r => {
+            r.closest('.choice').classList.remove('selected');
+          });
+          if (radio.checked) label.classList.add('selected');
+        };
+        radio.addEventListener('change', update);
+        // initial
+        if (radio.checked) label.classList.add('selected');
+        // click anywhere on card
+        label.addEventListener('click', () => {
+          radio.checked = true;
+          update();
+        });
+      });
+    }
+
+    setupChoiceGroup('chrome');
+    setupChoiceGroup('terminal');
+
+    const launchBtn = document.getElementById('launch-btn');
+
+    launchBtn.addEventListener('click', () => {
+      const chromeVisible = document.getElementById('chrome-visible').checked;
+      const terminalVisible = document.getElementById('terminal-visible').checked;
+
+      launchBtn.disabled = true;
+      launchBtn.innerHTML = '<span>Starting...</span>';
+
+      // Send to main process (exposed safely via preload)
+      if (window.api && window.api.startup && window.api.startup.applyConfig) {
+        window.api.startup.applyConfig({
+          chromeVisible: chromeVisible,
+          terminalVisible: terminalVisible
+        });
+      } else {
+        // Fallback (should not happen)
+        console.error('Startup API not available');
+        alert('Internal error: could not apply startup config.');
+      }
+    });
+
+    // Keyboard support
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !launchBtn.disabled) {
+        launchBtn.click();
+      }
+    });
+
+    // Optional: auto-focus the button after short delay (feels snappy)
+    setTimeout(() => {
+      launchBtn.focus();
+    }, 120);
+  </script>
+</body>
+</html>
