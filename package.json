@@ -1,10 +1,11 @@
 {
   "name": "fb-automation",
   "version": "1.0.0",
-  "description": "",
+  "description": "FB Marketplace Automation Studio - Electron app with Playwright CDP for dedicated Chrome bot and Grok-powered descriptions.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "build": "electron-builder --win",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,7 +14,32 @@
   "type": "commonjs",
   "dependencies": {
     "dotenv": "^17.4.2",
-    "electron": "^42.4.0",
     "playwright": "^1.60.0"
+  },
+  "devDependencies": {
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.2"
+  },
+  "build": {
+    "appId": "com.yoshstudios.fbmarketplace",
+    "productName": "FB Marketplace Automation",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "**/*",
+      "!node_modules/**/*",
+      "!dist/**/*"
+    ]
   }
 }
