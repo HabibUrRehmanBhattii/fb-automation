@@ -13,7 +13,9 @@ process.on('message', (msg) => {
 });
 
 function generateGrokDescription(folderName) {
-  const clean = String(folderName || '').replace(/[^\w\s-]/g, '').trim();
+  // Strip special chars, numbers, underscores, and dashes
+  let clean = String(folderName || '').replace(/[^\w\s-]/g, '');
+  clean = clean.replace(/[\d_-]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
 
   // Professional Marketplace Optimizer template baked in for raw 3D DIY cosplay kits.
   // Sets strict expectations (supports, sanding, etc.) and Toronto local focus.

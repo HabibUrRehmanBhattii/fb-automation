@@ -4,7 +4,7 @@
   "description": "FB Marketplace Automation Studio - Electron app with Playwright CDP for dedicated Chrome bot and Grok-powered descriptions.",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "node scripts/start-electron.js",
     "build": "electron-builder --win",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

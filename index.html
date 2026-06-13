@@ -38,7 +38,7 @@
 
     /* Custom Title Bar - Premium Look */
     #titlebar {
-      height: 52px;
+      height: 42px;
       background: linear-gradient(180deg, #0f172a 0%, #020617 100%);
       border-bottom: 1px solid var(--border);
       display: flex;
@@ -57,14 +57,14 @@
     }
 
     #titlebar .logo {
-      width: 28px;
-      height: 28px;
+      width: 24px;
+      height: 24px;
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      border-radius: 8px;
+      border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 15px;
+      font-size: 13px;
       font-weight: 700;
       color: white;
       box-shadow: 0 0 0 1px rgba(255,255,255,0.1);
@@ -72,7 +72,7 @@
 
     #titlebar .title {
       font-family: 'Space Grotesk', sans-serif;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       letter-spacing: -.2px;
     }
@@ -81,8 +81,8 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 12px;
-      padding: 4px 12px;
+      font-size: 11px;
+      padding: 3px 10px;
       background: #0f172a;
       border: 1px solid var(--border);
       border-radius: 9999px;
@@ -90,22 +90,22 @@
     }
 
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: #64748b;
-      box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.2);
+      box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.2);
       transition: all .2s ease;
     }
 
     .status-dot.connected {
       background: var(--success);
-      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
     }
 
     .status-dot.connecting {
       background: var(--warning);
-      box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.25);
+      box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.25);
       animation: pulse 1.5s infinite;
     }
 
@@ -116,12 +116,12 @@
     }
 
     .window-controls button {
-      width: 32px;
-      height: 28px;
+      width: 28px;
+      height: 24px;
       border: none;
       background: transparent;
       color: #94a3b8;
-      font-size: 15px;
+      font-size: 13px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -145,21 +145,21 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      padding: 20px 24px 12px;
-      gap: 18px;
+      padding: 10px 16px 8px;
+      gap: 10px;
       overflow: hidden;
       -webkit-app-region: no-drag;
     }
 
-    /* Folder Selector - Large Premium Drop Zone */
+    /* Folder Selector - Compact Premium Row */
     .folder-selector {
       background: linear-gradient(145deg, #0f172a, #020617);
-      border: 2px dashed #475569;
-      border-radius: 16px;
-      padding: 22px 28px;
+      border: 1px dashed #475569;
+      border-radius: 10px;
+      padding: 6px 12px;
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: 12px;
       transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
       position: relative;
       overflow: hidden;
@@ -172,37 +172,45 @@
     }
 
     .folder-icon {
-      width: 64px;
-      height: 64px;
+      font-size: 20px;
+      width: 32px;
+      height: 32px;
       background: linear-gradient(135deg, #1e2937, #334155);
-      border-radius: 14px;
+      border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 32px;
       flex-shrink: 0;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
     }
 
     .folder-info {
       flex: 1;
       min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .folder-info .label {
-      font-size: 13px;
-      font-weight: 500;
-      color: #94a3b8;
-      margin-bottom: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0;
+      white-space: nowrap;
     }
 
     .folder-info .path {
+      flex: 1;
       font-family: ui-monospace, monospace;
-      font-size: 13.5px;
+      font-size: 12px;
       color: #cbd5e1;
-      word-break: break-all;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       background: #020617;
-      padding: 4px 10px;
+      padding: 4px 8px;
       border-radius: 6px;
       border: 1px solid var(--border);
     }
@@ -211,10 +219,10 @@
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: white;
       border: none;
-      padding: 10px 20px;
-      border-radius: 10px;
+      padding: 6px 14px;
+      border-radius: 6px;
       font-weight: 600;
-      font-size: 13.5px;
+      font-size: 12px;
       cursor: pointer;
       transition: all .15s ease;
       box-shadow: 0 4px 12px -2px rgb(99 102 241 / 0.4);
@@ -262,7 +270,7 @@
       flex: 1;
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 10px;
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -270,11 +278,11 @@
 
     .queue-table-header {
       display: grid;
-      grid-template-columns: 54px 1fr 118px 90px;
-      gap: 12px;
-      padding: 11px 18px;
+      grid-template-columns: 30px 40px 1fr 80px 120px 100px 220px;
+      gap: 8px;
+      padding: 6px 12px;
       background: #1e2937;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       color: #64748b;
       text-transform: uppercase;
@@ -285,17 +293,202 @@
     .queue-rows {
       flex: 1;
       overflow-y: auto;
-      padding: 4px 0;
+      padding: 2px 0;
     }
 
     .queue-row {
       display: grid;
-      grid-template-columns: 54px 1fr 118px 90px;
-      gap: 12px;
+      grid-template-columns: 30px 40px 1fr 80px 120px 100px 220px;
+      gap: 8px;
       align-items: center;
-      padding: 9px 18px;
+      padding: 4px 12px;
       border-bottom: 1px solid #1e2937;
       transition: background .1s ease;
+    }
+
+    .row-price-input {
+      width: 68px;
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 2px 6px;
+      font-size: 12px;
+      font-weight: 600;
+      outline: none;
+    }
+    .row-price-input:focus {
+      border-color: var(--accent);
+    }
+
+    .row-template-select {
+      width: 124px;
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 2px 4px;
+      font-size: 11.5px;
+      font-weight: 500;
+      outline: none;
+      cursor: pointer;
+    }
+    .row-template-select:focus {
+      border-color: var(--accent);
+    }
+
+    /* Modal Styles */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-backdrop {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: rgba(2, 6, 23, 0.7);
+      backdrop-filter: blur(8px);
+    }
+
+    .modal-content {
+      position: relative;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 720px;
+      height: 520px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+      animation: modalScale 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes modalScale {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 24px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px;
+    }
+    .modal-close:hover {
+      color: var(--text);
+    }
+
+    .modal-body {
+      flex: 1;
+      padding: 20px;
+      overflow: hidden;
+    }
+
+    .templates-split {
+      display: flex;
+      gap: 20px;
+      height: 100%;
+    }
+
+    .templates-list-pane {
+      width: 220px;
+      border-right: 1px solid var(--border);
+      padding-right: 16px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    #templates-list-items {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .template-item {
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #1e2937;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .template-item:hover {
+      background: #334155;
+      border-color: #475569;
+    }
+    .template-item.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+    .template-item.system-default {
+      border-style: dashed;
+      opacity: 0.8;
+    }
+
+    .templates-edit-pane {
+      flex: 1;
+      height: 100%;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .input-group label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .modal-input {
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 13px;
+      outline: none;
+    }
+    .modal-input:focus {
+      border-color: var(--accent);
     }
 
     .queue-row:hover {
@@ -307,16 +500,16 @@
     }
 
     .thumb {
-      width: 42px;
-      height: 42px;
-      border-radius: 8px;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
       overflow: hidden;
       background: #1e2937;
       border: 1px solid #334155;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
+      font-size: 16px;
       flex-shrink: 0;
     }
 
@@ -328,7 +521,7 @@
 
     .folder-name {
       font-weight: 500;
-      font-size: 14px;
+      font-size: 13px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -339,9 +532,9 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
-      padding: 3px 11px;
+      padding: 2px 8px;
       border-radius: 999px;
       letter-spacing: .2px;
     }
@@ -354,21 +547,39 @@
     }
     .status-done { background: #166534; color: #4ade80; }
     .status-failed { background: #450a0a; color: #fda4af; }
+    .status-review { background: #7c2d12; color: #fdba74; }
 
     .row-actions {
       display: flex;
+      gap: 8px;
       justify-content: flex-end;
+    }
+
+    .row-btn {
+      padding: 4px 10px;
+      font-size: 11px;
+      border-radius: 9px;
+    }
+
+    .btn-success {
+      background: rgba(22, 101, 52, .72);
+      border: 1px solid rgba(74, 222, 128, .34);
+      color: #dcfce7;
+    }
+
+    .btn-success:hover:not(:disabled) {
+      background: rgba(21, 128, 61, .88);
     }
 
     /* Control Panel */
     .control-panel {
       display: flex;
-      align-items: center;
-      gap: 14px;
+      align-items: flex-end;
+      gap: 12px;
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 14px 20px;
+      border-radius: 12px;
+      padding: 8px 16px;
       flex-shrink: 0;
     }
 
@@ -379,7 +590,7 @@
     }
 
     .price-group label {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       color: #64748b;
       padding-left: 2px;
@@ -390,25 +601,25 @@
       align-items: center;
       background: #020617;
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 8px;
       overflow: hidden;
     }
 
     .price-input-wrapper span {
-      padding: 0 11px;
+      padding: 0 8px;
       color: #64748b;
       font-weight: 600;
-      font-size: 15px;
+      font-size: 13px;
     }
 
     .price-input-wrapper input {
       background: transparent;
       border: none;
       color: var(--text);
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 600;
-      width: 78px;
-      padding: 8px 0;
+      width: 64px;
+      padding: 4px 0;
       outline: none;
     }
 
@@ -417,10 +628,74 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
+      width: 260px;
+    }
+
+    #search-input {
+      transition: all 0.15s ease;
+    }
+    #search-input:focus {
+      border-color: var(--accent);
+      background: #1e2937 !important;
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+
+    @keyframes slideDown {
+      from { transform: translateY(-8px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    #image-dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 30px;
+      text-align: center;
+      background: #020617;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    #image-dropzone.dragover {
+      border-color: var(--accent);
+      background: #0f172a;
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    }
+    .image-preview-card {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #1e2937;
+    }
+    .image-preview-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .image-preview-card .remove-btn {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      border: none;
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
     }
 
     .title-group label {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       color: #64748b;
       padding-left: 2px;
@@ -431,32 +706,33 @@
       align-items: center;
       background: #020617;
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 8px;
       overflow: hidden;
+      width: 100%;
     }
 
     .title-input-wrapper input {
       background: transparent;
       border: none;
       color: var(--text);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
-      width: 170px;
-      padding: 8px 10px;
+      width: 100%;
+      padding: 4px 8px;
       outline: none;
       font-family: ui-monospace, monospace;
     }
 
     .btn {
       font-weight: 600;
-      font-size: 13.5px;
-      padding: 10px 22px;
-      border-radius: 10px;
+      font-size: 12px;
+      padding: 6px 14px;
+      border-radius: 6px;
       border: none;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       transition: all .15s cubic-bezier(0.4, 0.0, 0.2, 1);
       white-space: nowrap;
     }
@@ -466,8 +742,8 @@
       color: white;
       box-shadow: 0 6px 16px -3px rgb(99 102 241 / 0.45),
                   0 2px 4px -2px rgb(0 0 0 / 0.3);
-      font-size: 14.5px;
-      padding: 11px 28px;
+      font-size: 12.5px;
+      padding: 8px 20px;
     }
 
     .btn-primary:hover:not(:disabled) {
@@ -502,25 +778,25 @@
     .log-console {
       background: #000000;
       border-top: 1px solid #1f2937;
-      height: 138px;
+      height: 90px;
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 12px;
-      line-height: 1.35;
+      font-size: 11px;
+      line-height: 1.3;
       color: #4ade80;
       box-shadow: 0 -4px 12px rgb(0 0 0 / 0.4);
     }
 
     .log-header {
-      height: 26px;
+      height: 20px;
       background: #111111;
       color: #64748b;
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 600;
       letter-spacing: 1px;
-      padding: 0 16px;
+      padding: 0 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -569,6 +845,50 @@
       margin-bottom: 6px;
       padding-left: 2px;
     }
+    .queue-tabs {
+      display: flex;
+      gap: 4px;
+      background: #0f172a;
+      padding: 3px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .tab-btn {
+      background: transparent;
+      color: var(--muted);
+      border: none;
+      padding: 5px 14px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+    }
+    .tab-btn:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .tab-btn.active {
+      background: var(--panel-2);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .tab-btn .tab-count {
+      font-size: 10.5px;
+      background: #1e2937;
+      padding: 1px 6px;
+      border-radius: 10px;
+      color: #64748b;
+      font-weight: 500;
+      transition: all 0.15s ease;
+    }
+    .tab-btn.active .tab-count {
+      background: var(--border);
+      color: var(--text);
+    }
   </style>
 </head>
 <body>
@@ -600,32 +920,69 @@
 
   <div class="app-content">
     <!-- Target Folder Selector -->
-    <div>
-      <div class="section-title">TARGET PRODUCT FOLDER</div>
-      <div class="folder-selector" id="drop-zone">
-        <div class="folder-icon">📦</div>
-        <div class="folder-info">
-          <div class="label">Root directory containing cosplay product folders</div>
-          <div class="path" id="selected-path">No folder selected — drop a folder or use the button</div>
-        </div>
-        <button id="pick-folder-btn">Choose Folder</button>
+    <div class="folder-selector" id="drop-zone">
+      <div class="folder-icon">📦</div>
+      <div class="folder-info">
+        <div class="label">Product Folder:</div>
+        <div class="path" id="selected-path">No folder selected — drop a folder or click Choose Folder</div>
       </div>
+      <button id="pick-folder-btn">Choose Folder</button>
     </div>
 
     <!-- Queue Table -->
     <div class="queue-section">
       <div class="queue-header">
-        <h2>Product Queue <span class="queue-count" id="queue-count">(0 folders)</span></h2>
+        <div class="queue-tabs">
+          <button class="tab-btn active" id="tab-pending">
+            Product Queue <span class="tab-count" id="queue-count-pending">0</span>
+          </button>
+          <button class="tab-btn" id="tab-published">
+            Published History <span class="tab-count" id="queue-count-published">0</span>
+          </button>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; flex:1; margin-left:16px; max-width:260px;">
+          <input type="text" id="search-input" placeholder="🔍 Search products..." style="width:100%; background:#0f172a; border:1px solid var(--border); border-radius:8px; color:var(--text); padding:5px 10px; font-size:12px; outline:none;">
+        </div>
+        <span id="queue-count" style="display:none;">(0 folders)</span>
         <div style="display:flex; gap:8px;">
+          <button id="clean-names-btn" class="btn btn-secondary" style="padding:6px 14px; font-size:12px;">🧹 Clean Names</button>
           <button id="rescan-btn" class="btn btn-secondary" style="padding:6px 14px; font-size:12px;">Rescan</button>
           <button id="clear-queue-btn" class="btn btn-secondary" style="padding:6px 14px; font-size:12px;">Clear</button>
         </div>
       </div>
 
+      <!-- Bulk Edit Panel (hidden by default) -->
+      <div id="bulk-edit-panel" style="display:none; align-items:center; gap:12px; background:var(--panel-2); border:1px solid var(--accent); border-radius:10px; padding:6px 16px; margin-bottom:8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: slideDown 0.2s ease;">
+        <span id="bulk-select-count" style="font-size:12px; font-weight:600; color:var(--text);">0 items selected</span>
+        <div style="flex:1;"></div>
+        
+        <div style="display:flex; align-items:center; gap:6px;">
+          <label style="font-size:10px; font-weight:600; color:#cbd5e1; text-transform:uppercase;">Bulk Price:</label>
+          <input type="number" id="bulk-price-input" placeholder="Keep same" min="0" style="width:80px; background:#020617; border:1px solid var(--border); border-radius:6px; color:var(--text); padding:3px 8px; font-size:12px; outline:none;">
+        </div>
+
+        <div style="display:flex; align-items:center; gap:6px;">
+          <label style="font-size:10px; font-weight:600; color:#cbd5e1; text-transform:uppercase;">Bulk Template:</label>
+          <select id="bulk-template-select" style="background:#020617; border:1px solid var(--border); border-radius:6px; color:var(--text); padding:3px 8px; font-size:12px; outline:none; cursor:pointer;">
+            <option value="">Keep same</option>
+            <option value="deepseek">✨ DeepSeek AI Description</option>
+          </select>
+        </div>
+
+        <button id="bulk-apply-btn" class="btn btn-primary" style="padding:4px 12px; font-size:12px;">Apply to Selected</button>
+        <button id="bulk-deepseek-btn" class="btn" style="padding:4px 12px; font-size:12px; background:#1e3a5f; color:#93c5fd; border:1px solid #2563eb; border-radius:6px; cursor:pointer;">✨ Rewrite with DeepSeek</button>
+        <button id="bulk-cancel-btn" class="btn btn-secondary" style="padding:4px 12px; font-size:12px;">Cancel</button>
+      </div>
+
       <div class="queue-table">
-        <div class="queue-table-header">
+        <div class="queue-table-header" style="grid-template-columns: 30px 40px 1fr 80px 120px 100px 220px;">
+          <div style="display:flex; align-items:center; justify-content:center;">
+            <input type="checkbox" id="bulk-select-all" style="cursor:pointer; width:14px; height:14px; margin:0;">
+          </div>
           <div></div>
           <div>FOLDER / PRODUCT</div>
+          <div>PRICE</div>
+          <div>TEMPLATE</div>
           <div>STATUS</div>
           <div style="text-align:right;">ACTIONS</div>
         </div>
@@ -656,11 +1013,23 @@
         </div>
       </div>
 
+      <div class="deepseek-group" style="display:flex; flex-direction:column; gap:4px;">
+        <label style="font-size: 10px; font-weight: 600; color: #64748b; padding-left: 2px;">DEEPSEEK API KEY</label>
+        <div style="display:flex; align-items:center; background: #020617; border: 1px solid var(--border); border-radius: 8px; overflow:hidden; padding-right:4px;">
+          <input type="password" id="deepseek-key-input" placeholder="Paste API Key..." style="background:transparent; border:none; color:var(--text); font-size:12px; font-weight:600; width:130px; padding:4px 8px; outline:none;">
+          <button id="deepseek-verify-btn" class="btn" style="padding:2px 8px; font-size:10px; background:var(--accent); color:white; border:none; border-radius:4px; font-weight:600; cursor:pointer; margin:2px 0; height:20px; display:inline-flex; align-items:center; justify-content:center;">Verify</button>
+          <span id="deepseek-status" class="status-pill" style="font-size:9px; padding:1px 5px; background:#1e2937; color:#cbd5e1; margin-left:4px; margin-right:4px; border-radius:4px; white-space:nowrap;">No Key</span>
+        </div>
+      </div>
+
+      <button id="manage-templates-btn" class="btn btn-secondary">
+        📋 Templates
+      </button>
+
       <div class="visibility-controls" style="display:flex; flex-direction:column; gap:3px; font-size:10px;">
         <label style="color:#64748b; font-weight:600; font-size:10px;">VISIBILITY</label>
         <div style="display:flex; gap:4px;">
           <button id="toggle-chrome-btn" class="btn btn-secondary" style="padding:3px 6px; font-size:9px;">Chrome: Hidden</button>
-          <button id="toggle-terminal-btn" class="btn btn-secondary" style="padding:3px 6px; font-size:9px;">Terminal: Visible</button>
         </div>
       </div>
 
@@ -684,6 +1053,78 @@
       <button id="copy-log-btn" style="background:none; border:none; color:#64748b; font-size:10px; cursor:pointer; margin-left:8px;">COPY</button>
     </div>
     <div class="log-content" id="log-content"></div>
+  </div>
+
+  <!-- Premium Templates Management Modal -->
+  <div id="templates-modal" class="modal" style="display:none;">
+    <div class="modal-backdrop" id="templates-modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Manage Description Templates</h3>
+        <button class="modal-close" id="templates-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="templates-split">
+          <div class="templates-list-pane">
+            <div class="section-title">TEMPLATES</div>
+            <div id="templates-list-items">
+              <!-- Rendered dynamically -->
+            </div>
+            <button id="add-template-btn" class="btn btn-secondary" style="width:100%; margin-top:10px; font-size:12px; padding:6px;">+ Add New Template</button>
+          </div>
+          <div class="templates-edit-pane">
+            <div id="template-editor-form" style="display:none; flex-direction:column; gap:12px; height:100%;">
+              <div class="input-group">
+                <label>Template Name / Label</label>
+                <input type="text" id="tpl-label-input" class="modal-input" placeholder="e.g. Shield DIY">
+              </div>
+              <div class="input-group" style="flex:1; display:flex; flex-direction:column;">
+                <label>Description Text (Use \${name} for product name)</label>
+                <textarea id="tpl-text-input" class="modal-input" style="flex:1; resize:none; font-family:sans-serif; font-size:12px;" placeholder="Write description template..."></textarea>
+              </div>
+              <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button id="delete-template-btn" class="btn btn-danger" style="padding:6px 14px; font-size:12px;">Delete</button>
+                <button id="save-template-btn" class="btn btn-primary" style="padding:6px 18px; font-size:12px;">Save Template</button>
+              </div>
+            </div>
+            <div id="template-editor-empty" class="empty-state" style="height:100%; display:flex; align-items:center; justify-content:center;">
+              Select a template on the left or create a new one to edit.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drag-and-Drop Image Manager Modal -->
+  <div id="image-manager-modal" class="modal" style="display:none;">
+    <div class="modal-backdrop" id="image-manager-modal-backdrop"></div>
+    <div class="modal-content" style="width: 600px; height: 450px;">
+      <div class="modal-header">
+        <h3>Upload Images to <span id="image-manager-folder-name" style="color:var(--accent);">folder_name</span></h3>
+        <button class="modal-close" id="image-manager-modal-close">&times;</button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:16px; height:100%; overflow:hidden;">
+        <div id="image-dropzone" style="border: 2px dashed var(--border); border-radius: 10px; padding: 30px; text-align: center; background: #020617; cursor: pointer; transition: all 0.2s ease; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;">
+          <span style="font-size: 32px;">📸</span>
+          <div style="font-size:13px; font-weight:600; color:#cbd5e1;">Drag and drop images here, or click to select files</div>
+          <div style="font-size:11px; color:var(--muted);">Supports JPG, PNG, WEBP (Max 10 files)</div>
+          <input type="file" id="image-file-input" multiple accept="image/*" style="display:none;">
+        </div>
+        
+        <div style="flex:1; display:flex; flex-direction:column; min-height:0; gap:8px;">
+          <div class="section-title" style="margin:0;">PREVIEW IMAGES</div>
+          <div id="image-preview-grid" style="display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; overflow-y:auto; flex:1; padding:4px; border: 1px solid var(--border); border-radius:8px; background:#020617;">
+            <div class="empty-state" id="image-preview-empty" style="grid-column: span 5; padding: 20px; font-size:12px; color:var(--muted); text-align:center;">No images selected yet.</div>
+          </div>
+        </div>
+        
+        <div style="display:flex; gap:8px; justify-content:flex-end; padding-top:4px;">
+          <button id="cancel-upload-btn" class="btn btn-secondary" style="padding:6px 14px; font-size:12px;">Cancel</button>
+          <button id="save-upload-btn" class="btn btn-primary" style="padding:6px 18px; font-size:12px;" disabled>Save Images</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="renderer.js"></script>

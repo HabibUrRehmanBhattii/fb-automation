@@ -6,14 +6,24 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('api', {
   // Folder operations (native Windows dialogs + real fs scan)
   selectFolder: () => ipcRenderer.invoke('select-folder'),
+  getLastFolder: () => ipcRenderer.invoke('get-last-folder'),
   scanFolder: (folderPath) => ipcRenderer.invoke('scan-folder', folderPath),
+  cleanFolderNames: (folderPath) => ipcRenderer.invoke('clean-folder-names', folderPath),
+  loadTemplates: () => ipcRenderer.invoke('load-templates'),
+  saveTemplates: (templates) => ipcRenderer.invoke('save-templates', templates),
+  renameFolder: (parentPath, oldName, newName) => ipcRenderer.invoke('rename-folder', { parentPath, oldName, newName }),
+  openFolder: (folderPath) => ipcRenderer.invoke('open-folder', folderPath),
+  saveFolderCustomization: (folderName, price, template) => ipcRenderer.invoke('save-folder-customization', { folderName, price, template }),
 
   // Automation control
   startAutomation: (payload) => ipcRenderer.invoke('start-automation', payload),
   pauseAutomation: () => ipcRenderer.invoke('pause-automation'),
+  stopAutomation: () => ipcRenderer.invoke('stop-automation'),
   setDefaultPrice: (price) => ipcRenderer.invoke('set-default-price', price),
   setDefaultTitleTemplate: (tpl) => ipcRenderer.invoke('set-default-title-template', tpl),
   runSingleItem: (payload) => ipcRenderer.invoke('run-single-item', payload),
+  markItemDone: (payload) => ipcRenderer.invoke('mark-item-done', payload),
+  republishItem: (payload) => ipcRenderer.invoke('republish-item', payload),
 
   // Debug / Playwright browser (local visible browser for testing Marketplace flow)
   launchDebugBrowser: () => ipcRenderer.invoke('launch-debug-browser'),
@@ -55,4 +65,10 @@ contextBridge.exposeInMainWorld('api', {
   onBrowserStatus: (callback) => {
     ipcRenderer.on('browser-status', (_event, status) => callback(status));
   },
+
+  // DeepSeek API and Drag-and-drop Image Upload
+  validateDeepSeekKey: (key) => ipcRenderer.invoke('validate-deepseek-key', key),
+  getDeepSeekKey: () => ipcRenderer.invoke('get-deepseek-key'),
+  bulkDeepSeekRewrite: (names) => ipcRenderer.invoke('bulk-deepseek-rewrite', names),
+  saveUploadedImages: (folderPath, images) => ipcRenderer.invoke('save-uploaded-images', { folderPath, images }),
 });

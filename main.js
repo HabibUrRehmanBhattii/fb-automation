@@ -3,13 +3,24 @@ const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const { chromium } = require('playwright');
-const { spawn } = require('child_process');
+const { spawn, fork, execSync } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(require('child_process').exec);
 const os = require('os');
-const { execSync } = require('child_process');
 
 require('dotenv').config();
+
+// ==================== Configuration & Constants ====================
+const CONFIG = {
+  CHROME_PROFILE_DIR: 'C:\\chrome-automation-profile',
+  CDP_PORT: 9222,
+  MARKETPLACE_URL: 'https://www.facebook.com/marketplace/create/item',
+  WINDOW_WIDTH: 1120,
+  WINDOW_HEIGHT: 820,
+  BG_COLOR: '#020617',
+  MIN_POST_DELAY_MS: 180000, // 3 minutes
+  MAX_POST_DELAY_MS: 480000  // 8 minutes
+};
 
 // Robust helper to run PowerShell code from Node on Windows.
 // Uses a temp .ps1 file to avoid all the quoting / here-string / -Command hell.
@@ -42,7 +53,7 @@ let defaultTitleTemplate = '${name}';
 let tray = null;
 let isQuitting = false;
 let chromeVisible = true; // VISIBLE by default (rollback state)
-let terminalVisible = true; // VISIBLE by default (rollback state)
+let terminalVisible = false; // HIDDEN by default
 
 // Persistent session backup (cookies for facebook.com). The real long-term persistence
 // comes from always launching Chrome with the SAME --user-data-dir folder.
@@ -51,11 +62,11 @@ const fbCookiesFile = path.join(app.getPath('userData'), 'fb-cookies.json');
 // ==================== Window Creation (Premium Frameless Dark) ====================
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1120,
-    height: 820,
+    width: CONFIG.WINDOW_WIDTH,
+    height: CONFIG.WINDOW_HEIGHT,
     minWidth: 980,
     minHeight: 680,
-    backgroundColor: '#020617',
+    backgroundColor: CONFIG.BG_COLOR,
     frame: false,                 // Custom title bar for ultra-premium look
     titleBarStyle: 'hidden',
     webPreferences: {
@@ -233,6 +244,176 @@ async function saveProcessed(processedList) {
   }
 }
 
+// ==================== folder_customizations.json tracking (remembers custom template/price selections) ====================
+const folderCustomizationsFile = path.join(app.getPath('userData'), 'folder_customizations.json');
+
+async function loadFolderCustomizations() {
+  try {
+    const data = await fs.readFile(folderCustomizationsFile, 'utf8');
+    return JSON.parse(data);
+  } catch {
+    return {};
+  }
+}
+
+async function saveFolderCustomizations(customizations) {
+  try {
+    await fs.writeFile(folderCustomizationsFile, JSON.stringify(customizations, null, 2), 'utf8');
+    return true;
+  } catch (err) {
+    sendLog(`[Error]: Failed to save folder customizations — ${err.message}`);
+    return false;
+  }
+}
+
+// ==================== settings.json tracking (remembers general app settings like lastFolder) ====================
+const settingsFile = path.join(app.getPath('userData'), 'settings.json');
+
+async function loadSettings() {
+  try {
+    const data = await fs.readFile(settingsFile, 'utf8');
+    return JSON.parse(data);
+  } catch {
+    return {};
+  }
+}
+
+async function saveSettings(settings) {
+  try {
+    await fs.writeFile(settingsFile, JSON.stringify(settings, null, 2), 'utf8');
+    return true;
+  } catch (err) {
+    sendLog(`[Error]: Failed to save settings — ${err.message}`);
+    return false;
+  }
+}
+
+// ==================== templates.json tracking (custom description templates) ====================
+const templatesFile = path.join(app.getPath('userData'), 'templates.json');
+
+const defaultTemplates = {
+  helmet: {
+    label: "Helmet DIY",
+    text: `3D Printed DIY Cosplay Helmet Kit - \${name}
+
+Bring your favorite character to life with this highly detailed, 3D printed DIY cosplay helmet kit! Perfect for cosplayers, makers, and collectors.
+
+What is included:
+- Premium quality 3D printed raw parts (unassembled)
+- Printed in durable PLA/PETG material
+- Raw print status: Needs sanding, priming, and painting to your liking
+
+Sizing:
+- Fits standard adult head sizes (approx. 22-24 inches circumference). Let us know if you need specific sizing.
+
+Please note: This is a DIY kit. Sanding, gluing, and painting are required to achieve a finished prop. Renders shown are for reference.`
+  },
+  axe: {
+    label: "Axe DIY",
+    text: `3D Printed DIY Cosplay Axe Kit - \${name}
+
+Craft the ultimate weapon prop with this premium 3D printed DIY cosplay axe kit! Superb details, perfect for display, conventions, or photoshoot.
+
+What is included:
+- Premium 3D printed raw parts (unassembled)
+- Engineered with alignment keys/internal dowel channels for easy assembly and maximum durability
+- Printed in robust PLA/PETG
+
+Please note: This is a raw DIY kit. Gluing, sanding, and painting are required to finish the prop. Assembly rod/dowel is not included.`
+  },
+  sword: {
+    label: "Sword DIY",
+    text: `3D Printed DIY Cosplay Sword Kit - \${name}
+
+Forge your own legendary blade! This premium 3D printed DIY cosplay sword kit features screen-accurate details and a durable design.
+
+What is included:
+- Raw 3D printed pieces (unassembled)
+- Features internal alignment channels for inserting a reinforcing metal or wood rod
+- Printed in high-strength PLA/PETG
+
+Perfect for conventions, photo shoots, and collections.
+Note: This is a raw print kit. Sanding, assembly (glue), and custom paint work are required. Reinforcing rod not included.`
+  },
+  armor: {
+    label: "Armor DIY",
+    text: `3D Printed DIY Cosplay Armor Set/Piece - \${name}
+
+Upgrade your cosplay with this highly detailed, 3D printed DIY armor kit! Lightweight, durable, and designed for maximum comfort and realism.
+
+What is included:
+- Raw 3D printed armor parts (unassembled and unpainted)
+- Durable PLA/PETG construction
+
+Sizing:
+- Standard adult fit. Can be scaled or heat-formed slightly for a custom fit.
+
+Note: Sanding, priming, painting, and strapping are required. Raw 3D prints may have slight surface lines.`
+  },
+  mask: {
+    label: "Mask",
+    text: `3D Printed Cosplay Mask / Wearable Prop - \${name}
+
+Highly detailed, screen-accurate 3D printed cosplay mask! Lightweight and durable, perfect for cosplay, display, or conventions.
+
+Features:
+- Raw 3D print ready for your custom finish
+- Printed in high-grade PLA/PETG
+- Can be easily sanded, primed, and painted
+
+Note: This is a DIY mask kit. Straps, padding, painting, and finishing are done by the buyer.`
+  },
+  lifesize: {
+    label: "Special Life Sized",
+    text: `Life-Size 3D Printed DIY Cosplay Prop / Replica - \${name}
+
+An incredible 1:1 scale life-size replica prop! Perfect for ultimate display collections, man caves, and conventions.
+
+Details:
+- Full 1:1 scale life-size model
+- 3D printed raw assembly kit
+- Highly detailed surfaces
+
+Note: Assembly, gluing, sanding, and painting are required. Renders shown are for visual reference of the finished piece.`
+  },
+  universal: {
+    label: "Universal",
+    text: `3D Printed DIY Cosplay Prop Kit - \${name}
+
+Premium 3D printed DIY replica prop. A fantastic project for any cosplay enthusiast, maker, or gamer!
+
+Includes:
+- High-quality raw 3D printed parts
+- Durable PLA/PETG material
+- Unassembled and unpainted
+
+Note: This is a DIY kit. Sanding, assembly (gluing), and painting are required to finish the product.`
+  }
+};
+
+async function loadTemplatesInternal() {
+  try {
+    const data = await fs.readFile(templatesFile, 'utf8');
+    const parsed = JSON.parse(data);
+    return parsed && typeof parsed === 'object' ? parsed : defaultTemplates;
+  } catch {
+    try {
+      await fs.writeFile(templatesFile, JSON.stringify(defaultTemplates, null, 2));
+    } catch (_) {}
+    return defaultTemplates;
+  }
+}
+
+async function saveTemplatesInternal(templates) {
+  try {
+    await fs.writeFile(templatesFile, JSON.stringify(templates, null, 2));
+    return true;
+  } catch (err) {
+    sendLog(`[Error]: Failed to save templates - ${err.message}`);
+    return false;
+  }
+}
+
 // ==================== Native Dialog + Real Folder Scanning ====================
 ipcMain.handle('select-folder', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -247,6 +428,32 @@ ipcMain.handle('select-folder', async () => {
   return result.filePaths[0];
 });
 
+ipcMain.handle('get-last-folder', async () => {
+  try {
+    const settings = await loadSettings();
+    if (settings.lastFolder) {
+      try {
+        await fs.access(settings.lastFolder);
+        return settings.lastFolder;
+      } catch (_) {}
+    }
+  } catch (_) {}
+  return null;
+});
+
+function getFolderValidity(name, imageCount) {
+  if (imageCount === 0) {
+    return { valid: false, status: 'Review', reason: 'No Images' };
+  }
+  if (/^item_/i.test(name)) {
+    return { valid: false, status: 'Review', reason: 'Generic Name' };
+  }
+  if (/\s\(\d+\)$/.test(name)) {
+    return { valid: false, status: 'Review', reason: 'Duplicate' };
+  }
+  return { valid: true, status: 'Pending', reason: null };
+}
+
 ipcMain.handle('scan-folder', async (event, folderPath) => {
   if (!folderPath) return [];
 
@@ -254,27 +461,42 @@ ipcMain.handle('scan-folder', async (event, folderPath) => {
   currentQueue = [];
 
   try {
+    const settings = await loadSettings();
+    settings.lastFolder = folderPath;
+    await saveSettings(settings);
+
     const entries = await fs.readdir(folderPath, { withFileTypes: true });
     const subdirs = entries.filter(e => e.isDirectory());
 
     const processed = await loadProcessed();
-    sendLog(`[System]: Found ${subdirs.length} subfolders. Filtering against processed.json (${processed.length} already done)...`);
+    const customizations = await loadFolderCustomizations();
+    sendLog(`[System]: Found ${subdirs.length} subfolders. Scanning items...`);
 
     for (const dir of subdirs) {
-      if (processed.includes(dir.name)) continue; // Filter per requirement
-
+      const isProcessed = processed.includes(dir.name);
       const fullPath = path.join(folderPath, dir.name);
+      await ensureImagesExtracted(fullPath);
       const thumb = await findFirstImage(fullPath);
+
+      const images = await getImagesInFolder(fullPath);
+      const validity = getFolderValidity(dir.name, images.length);
+
+      const custom = customizations[dir.name] || {};
 
       currentQueue.push({
         name: dir.name,
         fullPath,
-        status: 'Pending',
+        status: isProcessed ? 'Done' : validity.status,
+        errorReason: isProcessed ? null : validity.reason,
         thumb,
+        price: custom.price,
+        template: custom.template
       });
     }
 
-    sendLog(`[Scanner]: ${currentQueue.length} pending product folders after filtering processed.json.`);
+    const pendingCount = currentQueue.filter(i => i.status !== 'Done').length;
+    const publishedCount = currentQueue.filter(i => i.status === 'Done').length;
+    sendLog(`[Scanner]: ${currentQueue.length} folders scanned: ${pendingCount} pending, ${publishedCount} published.`);
     sendQueueUpdate();
     return currentQueue;
   } catch (err) {
@@ -283,86 +505,364 @@ ipcMain.handle('scan-folder', async (event, folderPath) => {
   }
 });
 
-// ==================== Real Automation Engine (grok_cli + Playwright CDP) ====================
+// ==================== Folder Name Cleaning Utility & IPC Handler ====================
+function cleanFolderName(name) {
+  let cleaned = name;
+  // 1. Google Drive zip timestamp suffix, e.g. -20260410T132343Z-3-001
+  cleaned = cleaned.replace(/-\d{8}T\d{6}Z(?:-\d+)*$/i, '');
+  // 2. Social handles, e.g. @Print3DWorld
+  cleaned = cleaned.replace(/\s*@[\w-]+/gi, '');
+  // 3. Telegram links/handles, e.g. t.me_MOXOMOR_aka
+  cleaned = cleaned.replace(/\s*t\.me_\S+/gi, '');
+  // Trim any leading/trailing spaces or leftover dashes/underscores at the ends
+  cleaned = cleaned.replace(/^[\s-_]+|[\s-_]+$/g, '');
+  
+  if (!cleaned) {
+    cleaned = name;
+  }
+  return cleaned;
+}
+
+async function getUniqueFolderName(parentDir, cleanedName, originalName) {
+  let targetName = cleanedName;
+  let counter = 1;
+  while (true) {
+    if (targetName === originalName) {
+      return targetName;
+    }
+    const targetPath = path.join(parentDir, targetName);
+    try {
+      await fs.access(targetPath);
+      // Path exists, so we need to generate a new name
+      targetName = `${cleanedName} (${counter})`;
+      counter++;
+    } catch {
+      // Path does not exist, safe to use!
+      return targetName;
+    }
+  }
+}
+
+// Quick recursive check inside product folder to see if there is any zip file
+async function hasZipFileRecursive(dirPath) {
+  try {
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.toLowerCase().endsWith('.zip')) {
+        return true;
+      }
+      if (entry.isDirectory()) {
+        const found = await hasZipFileRecursive(path.join(dirPath, entry.name));
+        if (found) return true;
+      }
+    }
+  } catch (_) {}
+  return false;
+}
+
+// Asynchronous PowerShell runner for zip extraction
+async function runPowerShellAsync(scriptContent) {
+  if (process.platform !== 'win32') return;
+  const tmpFile = path.join(os.tmpdir(), `fb-auto-${Date.now()}-${Math.random().toString(36).slice(2)}.ps1`);
+  try {
+    await fs.writeFile(tmpFile, scriptContent, 'utf8');
+    await execPromise(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpFile}"`, {
+      windowsHide: true
+    });
+  } catch (e) {
+    sendLog(`[Error]: PowerShell zip extract failed - ${e.message}`);
+  } finally {
+    try { await fs.unlink(tmpFile); } catch (_) {}
+  }
+}
+
+// Extracts only images from any zip files inside productFolderPath recursively
+async function extractImagesFromZips(productFolderPath) {
+  if (process.platform !== 'win32') return;
+  
+  const escapedPath = productFolderPath.replace(/'/g, "''");
+  
+  const scriptContent = `
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$parentDir = '${escapedPath}'
+$zips = Get-ChildItem -Path $parentDir -Filter *.zip -File -Recurse
+foreach ($zipFile in $zips) {
+    try {
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($zipFile.FullName)
+        foreach ($entry in $zip.Entries) {
+            if ($entry.FullName -match '\\.(jpe?g|png|webp|gif)$') {
+                $entryName = $entry.Name
+                if ($entryName) {
+                    $targetPath = Join-Path $parentDir $entryName
+                    [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $targetPath, $true)
+                }
+            }
+        }
+        $zip.Dispose()
+    } catch {}
+}
+`;
+  
+  await runPowerShellAsync(scriptContent);
+}
+
+// Ensures images are extracted if product folder has 0 or 1 images and contains zip file(s)
+async function ensureImagesExtracted(folderPath) {
+  try {
+    const flagFile = path.join(folderPath, '.extracted-imgs');
+    try {
+      await fs.access(flagFile);
+      // Already extracted/checked, skip to avoid repeating PowerShell overhead
+      return;
+    } catch {
+      // Flag file doesn't exist, proceed
+    }
+
+    const images = await getImagesInFolder(folderPath);
+    if (images.length <= 1) {
+      const hasZip = await hasZipFileRecursive(folderPath);
+      if (hasZip) {
+        sendLog(`[Scanner]: Folder "${path.basename(folderPath)}" has ${images.length} image(s). Extracting preview images from zip...`);
+        await extractImagesFromZips(folderPath);
+        // Write flag file so we don't scan it again
+        await fs.writeFile(flagFile, 'extracted', 'utf8');
+      }
+    }
+  } catch (_) {}
+}
+
+ipcMain.handle('clean-folder-names', async (event, folderPath) => {
+  if (isAutomationRunning) {
+    return { success: false, message: 'Cannot clean folder names while automation is running.' };
+  }
+  if (!folderPath) {
+    return { success: false, message: 'No folder path selected.' };
+  }
+
+  try {
+    const entries = await fs.readdir(folderPath, { withFileTypes: true });
+    const subdirs = entries.filter(e => e.isDirectory());
+
+    let renamedCount = 0;
+    const processed = await loadProcessed();
+    let processedChanged = false;
+
+    for (const dir of subdirs) {
+      const originalName = dir.name;
+      const cleanedName = cleanFolderName(originalName);
+
+      if (cleanedName !== originalName) {
+        const uniqueName = await getUniqueFolderName(folderPath, cleanedName, originalName);
+        
+        if (uniqueName !== originalName) {
+          const oldPath = path.join(folderPath, originalName);
+          const newPath = path.join(folderPath, uniqueName);
+
+          await fs.rename(oldPath, newPath);
+          sendLog(`[Scanner]: Renamed folder "${originalName}" -> "${uniqueName}"`);
+          
+          // Update processed.json if this folder was already done
+          const idx = processed.indexOf(originalName);
+          if (idx !== -1) {
+            if (!processed.includes(uniqueName)) {
+              processed[idx] = uniqueName;
+            } else {
+              processed.splice(idx, 1);
+            }
+            processedChanged = true;
+          }
+
+          // Update customizations if any
+          const customizations = await loadFolderCustomizations();
+          if (customizations[originalName]) {
+            customizations[uniqueName] = customizations[originalName];
+            delete customizations[originalName];
+            await saveFolderCustomizations(customizations);
+          }
+          
+          renamedCount++;
+        }
+      }
+    }
+
+    if (processedChanged) {
+      await saveProcessed(processed);
+      sendLog(`[Scanner]: Updated processed.json entries for renamed folders.`);
+    }
+
+    if (renamedCount > 0) {
+      sendLog(`[Scanner]: Successfully cleaned ${renamedCount} folder names.`);
+    } else {
+      sendLog(`[Scanner]: No folders needed renaming.`);
+    }
+
+    return { success: true, renamedCount };
+  } catch (err) {
+    sendLog(`[Error]: Failed to clean folder names - ${err.message}`);
+    return { success: false, message: err.message };
+  }
+});
+
+// ==================== Real Automation Engine (DeepSeek + Playwright CDP) ====================
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Background Grok execution - now uses YOU (Grok) directly, hidden + isolated process.
-// We fork a dedicated worker (grok-description-worker.js) so generation is completely
-// separate from the main Electron thread and Playwright. No external grok_cli binary,
-// no visible CLI, fully hidden.
-async function generateDescriptionWithGrok(productName) {
-  sendLog(`[Grok]: Generating description for "${productName}"...`);
+async function clickVisibleActionButton(page, label, options = {}) {
+  const timeout = options.timeout || 15000;
+  const exactLabel = String(label).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const labelRegex = new RegExp(`^\\s*${exactLabel}\\s*$`, 'i');
+  const deadline = Date.now() + timeout;
 
-  try {
-    const command = `powershell.exe -ExecutionPolicy Bypass -Command ". \\$PROFILE; grok -p 'Write a short, high-converting Facebook Marketplace description for a raw 3D printed ${productName} DIY cosplay kit. YOU MUST FOLLOW THESE RULES STRICTLY: 1. Explicitly state that NO visors or lenses are included (only the plastic outline/frame if included in the 3D file). 2. Emphasize it is an unpainted raw print requiring sanding and prep. 3. State that BOTH Local Pickup in Toronto and Shipping are available. Reply ONLY with the description text, no extra conversational filler.' "`;
-    
-    const { stdout } = await execPromise(command);
-    
-    let description = stdout.trim();
-    
-    // Clean and stream like before
-    if (description) {
-      description.split(/\r?\n/).forEach(line => {
-        const trimmed = line.trim();
-        if (trimmed) sendLog(`[Grok]: ${trimmed}`);
-      });
-      sendLog(`[Grok]: High-converting description ready (${description.length} chars).`);
-      return description;
-    } else {
-      // fallback
-      const fallback = generateHighQualityGrokDescription(productName);
-      fallback.split(/\r?\n/).forEach(line => {
-        const trimmed = line.trim();
-        if (trimmed) sendLog(`[Grok]: ${trimmed}`);
-      });
-      return fallback;
+  const candidates = [
+    page.getByRole('button', { name: labelRegex }),
+    page.locator('button, div[role="button"], span[role="button"]').filter({ hasText: labelRegex }),
+  ];
+
+  while (Date.now() < deadline) {
+    for (const locator of candidates) {
+      const count = await locator.count().catch(() => 0);
+
+      for (let index = 0; index < count; index++) {
+        const candidate = locator.nth(index);
+        const isVisible = await candidate.isVisible().catch(() => false);
+        if (!isVisible) continue;
+
+        const ariaLabel = await candidate.getAttribute('aria-label').catch(() => '');
+        if (/image|photo|carousel|previous/i.test(ariaLabel || '')) continue;
+
+        const ariaDisabled = await candidate.getAttribute('aria-disabled').catch(() => '');
+        const disabledAttr = await candidate.getAttribute('disabled').catch(() => null);
+        const isEnabled = await candidate.isEnabled().catch(() => true);
+        if (ariaDisabled === 'true' || disabledAttr !== null || !isEnabled) continue;
+
+        await candidate.scrollIntoViewIfNeeded().catch(() => {});
+        await candidate.click({ timeout: 5000 });
+        return true;
+      }
     }
-  } catch (error) {
-    sendLog(`[Grok]: Description generation error — ${error.message}. Using fallback.`);
-    const fallback = generateHighQualityGrokDescription(productName);
-    fallback.split(/\r?\n/).forEach(line => {
-      const trimmed = line.trim();
-      if (trimmed) sendLog(`[Grok]: ${trimmed}`);
+
+    await delay(350);
+  }
+
+  throw new Error(`Could not find an enabled "${label}" action button.`);
+}
+
+// Background DeepSeek execution
+async function generateDescriptionWithDeepSeek(apiKey, productName) {
+  sendLog(`[DeepSeek]: Generating description for "${productName}"...`);
+  try {
+    const prompt = `Write a high-converting, friendly, and details-rich Facebook Marketplace product description for: "${productName}". 
+This is a raw 3D printed DIY cosplay prop/helmet kit (unassembled, unpainted, needs sanding and assembly, printed in PLA/PETG, standard adult sizing, local pickup in Toronto and shipping available).
+Make it readable with bullet points. Avoid markdown brackets like [ ] or asterisks * if possible, or keep formatting clean. Do not include price.`;
+
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'deepseek-v4-flash',
+        messages: [{ role: 'user', content: prompt }]
+      })
     });
-    return fallback;
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`API returned status ${response.status}: ${errText}`);
+    }
+
+    const data = await response.json();
+    if (data.choices && data.choices[0] && data.choices[0].message) {
+      const text = data.choices[0].message.content.trim();
+      sendLog(`[DeepSeek]: Generated description successfully (${text.length} chars).`);
+      return text;
+    } else {
+      throw new Error('Unexpected API response structure');
+    }
+  } catch (err) {
+    sendLog(`[DeepSeek Error]: Description generation failed - ${err.message}. Using generic fallback.`);
+    return `${productName} — Raw 3D printed DIY cosplay kit. Unassembled, unpainted, PLA/PETG. Local pickup Toronto, shipping available.`;
   }
 }
 
-// High-quality Grok-style generator (what Grok would actually output).
-// Uses the professional Marketplace Optimizer template for raw 3D DIY cosplay kits.
-// Sets strict expectations for layer lines, supports, sanding, etc. Local Toronto focus.
-function generateHighQualityGrokDescription(productName) {
-  const clean = String(productName || '').replace(/[^\w\s-]/g, '').trim();
+async function generateTitleWithDeepSeek(apiKey, folderName) {
+  sendLog(`[DeepSeek]: Generating title for "${folderName}"...`);
+  try {
+    const prompt = `Convert this raw folder name into a short, clean Facebook Marketplace listing title (max 8 words, no special characters, no price): "${folderName}". Reply with only the title, nothing else.`;
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'deepseek-v4-flash', messages: [{ role: 'user', content: prompt }], max_tokens: 30 })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const title = data.choices?.[0]?.message?.content?.trim();
+    if (title) { sendLog(`[DeepSeek]: Title: "${title}"`); return title; }
+    throw new Error('Empty response');
+  } catch (err) {
+    sendLog(`[DeepSeek Warning]: Title generation failed — ${err.message}. Using folder name.`);
+    return folderName.replace(/[\d_-]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  }
+}
 
-  return `Up your cosplay game with this 3D-printed ${clean} DIY cosplay kit!
+async function diagnoseErrorWithDeepSeek(apiKey, itemName, errorMessage) {
+  try {
+    const safeError = errorMessage.substring(0, 300);
+    const prompt = `My Playwright automation for Facebook Marketplace failed on item "${itemName}" with: "${safeError}". In 1-2 short sentences, what likely went wrong and what should I check?`;
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'deepseek-v4-flash', messages: [{ role: 'user', content: prompt }], max_tokens: 80 })
+    });
+    if (!response.ok) return;
+    const data = await response.json();
+    const diagnosis = data.choices?.[0]?.message?.content?.trim();
+    if (diagnosis) sendLog(`[DeepSeek Diagnosis]: ${diagnosis}`);
+  } catch (_) {}
+}
 
-This is a raw, unfinished DIY kit straight off the print bed, ready for your custom finishing!
+const FB_CATEGORY_MAP = {
+  'toys': /Toys and games/i,
+  'hobbies': /Hobbies/i,
+  'collectibles': /Collectibles/i,
+  'art': /Art/i,
+  'crafts': /Arts and crafts/i,
+  'electronics': /Electronics/i,
+  'clothing': /Clothing/i,
+  'sporting': /Sporting goods/i,
+  'other': /Other/i,
+};
 
-️ THE DETAILS:
-• Scale: 1:1 True-to-size (fits most adults).
-• Condition: Raw 3D print. Support structures may still be attached to protect the finer details during transport.
-• Work Required: This is a DIY kit! It will require standard prep work (sanding, priming, assembling, and painting) to achieve that perfect screen-accurate finish.
-• Materials: Printed in durable, high-quality PLA/PETG. (Default colors are usually Grey, Black, or White depending on filament availability).
-• Accessories / Visors: Visors and lenses are NOT included. I only print the plastic visor outline/frame if it is available in the original 3D file.
-
- CUSTOM SIZING:
-Have a specific head measurement? I can easily scale this up or down. Just shoot me a message before buying!
-
- LOGISTICS:
-Local pickup in Toronto, and shipping is available! Cash or e-transfer. Message me with any questions, for exact dimensions, or to get a shipping quote.`;
+async function selectCategoryWithDeepSeek(apiKey, productName) {
+  try {
+    const categories = Object.keys(FB_CATEGORY_MAP).join(', ');
+    const prompt = `For a Facebook Marketplace listing titled "${productName}", pick the single most fitting category from this list: ${categories}. Reply with only one word from the list.`;
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'deepseek-v4-flash', messages: [{ role: 'user', content: prompt }], max_tokens: 10 })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const raw = data.choices?.[0]?.message?.content?.trim().toLowerCase() || '';
+    for (const [key, regex] of Object.entries(FB_CATEGORY_MAP)) {
+      if (raw.includes(key)) return regex;
+    }
+  } catch (_) {}
+  return /Toys and games/i;
 }
 
 // Playwright routine using user's running Chrome via CDP
 // Robust best-effort filling for title (templated), price, description, photos, category, condition.
 // FB Marketplace UI changes often, so we use multiple locator strategies + granular error handling.
 // Final action is limited to safe "Next" + explicit boost dismissal to avoid auto-activating promote/boost.
-async function createFbMarketplaceListing({ title, description, price, imagePaths, titleTemplate, uploadState = { count: 0 }, MAX_DAILY_UPLOADS = 15 }) {
+async function createFbMarketplaceListing({ title, description, price, imagePaths, titleTemplate, apiKey, uploadState = { count: 0 }, MAX_DAILY_UPLOADS = 15 }) {
   // Prefer explicit IPv4 to avoid the ::1 ECONNREFUSED some users see with "localhost"
   const cdpEndpoints = [
-    'http://127.0.0.1:9222',
-    'http://localhost:9222'
+    `http://127.0.0.1:${CONFIG.CDP_PORT}`,
+    `http://localhost:${CONFIG.CDP_PORT}`
   ];
 
   sendLog(`[Playwright]: Connecting to running Chrome on ${cdpEndpoints[0]} (CDP) ...`);
@@ -373,7 +873,7 @@ async function createFbMarketplaceListing({ title, description, price, imagePath
   for (const endpoint of cdpEndpoints) {
     try {
       browser = await chromium.connectOverCDP(endpoint);
-      sendLog(`[Playwright]: Connected via CDP to the Chrome listening on port 9222 (${endpoint}).`);
+      sendLog(`[Playwright]: Connected via CDP to the Chrome listening on port ${CONFIG.CDP_PORT} (${endpoint}).`);
       sendBrowserStatus('connected');
       break;
     } catch (e) {
@@ -383,26 +883,25 @@ async function createFbMarketplaceListing({ title, description, price, imagePath
   }
 
   if (!browser) {
-    sendLog(`[Playwright Error]: ${lastErr ? lastErr.message : 'Could not connect to Chrome on port 9222'}`);
-    sendLog(`[Tip]: Launch Chrome with: chrome.exe --remote-debugging-port=9222 --user-data-dir="C:\\chrome-automation-profile" (and log into Facebook in that window)`);
+    sendLog(`[Playwright Error]: ${lastErr ? lastErr.message : `Could not connect to Chrome on port ${CONFIG.CDP_PORT}`}`);
+    sendLog(`[Tip]: Launch Chrome with: chrome.exe --remote-debugging-port=${CONFIG.CDP_PORT} --user-data-dir="${CONFIG.CHROME_PROFILE_DIR}" (and log into Facebook in that window)`);
     return { success: false, message: lastErr ? lastErr.message : 'CDP connect failed' };
   }
 
   try {
-    sendLog(`[!!! WARNING !!!] This automation is now CONTROLLING the Chrome instance that has --remote-debugging-port=9222.`);
+    sendLog(`[!!! WARNING !!!] This automation is now CONTROLLING the Chrome instance that has --remote-debugging-port=${CONFIG.CDP_PORT}.`);
     sendLog(`[!!! WARNING !!!] If this is your MAIN personal Chrome (the one with Gmail, tabs, etc.), automation actions may interfere with it or create listings in the wrong profile.`);
-    sendLog(`[!!! WARNING !!!] Recommended: Always use the dedicated "C:\\chrome-automation-profile" Chrome for the bot. Keep your personal Chrome completely separate (no debug port).`);
+    sendLog(`[!!! WARNING !!!] Recommended: Always use the dedicated "${CONFIG.CHROME_PROFILE_DIR}" Chrome for the bot. Keep your personal Chrome completely separate (no debug port).`);
     sendLog(`[Note]: Use the top-right "Automation Chrome (CDP)" button or Start Automation to ensure the dedicated profile is running.`);
 
     const contexts = browser.contexts();
     const context = contexts.length > 0 ? contexts[0] : await browser.newContext();
     const page = await context.newPage();
 
-    const marketplaceUrl = 'https://www.facebook.com/marketplace/create/item';
     sendLog(`[Playwright]: Navigating to Marketplace (bypassing heavy network load)...`);
 
     // Use domcontentloaded so Playwright doesn't wait for images and trackers
-    await page.goto(marketplaceUrl, { 
+    await page.goto(CONFIG.MARKETPLACE_URL, { 
       waitUntil: 'domcontentloaded',
       timeout: 60000 
     });
@@ -417,7 +916,10 @@ async function createFbMarketplaceListing({ title, description, price, imagePath
     try {
       sendLog(`[Playwright]: Filling title...`);
       const tpl = (titleTemplate || defaultTitleTemplate || '${name}');
-      const filledTitle = tpl.replace(/\$\{name\}/gi, title).trim() || title;
+      let filledTitle = tpl.replace(/\$\{name\}/gi, title).trim() || title;
+      // Strip numbers, underscores, and dashes commonly found in folder names
+      filledTitle = filledTitle.replace(/[\d_-]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+      
       const titleInput = page.getByLabel(/title/i)
         .or(page.getByPlaceholder(/what are you selling/i))
         .or(page.locator('input[aria-label*="Title"]'))
@@ -462,11 +964,11 @@ async function createFbMarketplaceListing({ title, description, price, imagePath
     // Facebook keeps a hidden <input type="file"> under the hood — target it directly.
     if (imagePaths && imagePaths.length > 0) {
       try {
-        sendLog(`[Playwright]: Uploading ${imagePaths.length} images from folder...`);
+        const sortedImages = [...imagePaths].sort().slice(0, 10); // FB limits max 10 photos
+        sendLog(`[Playwright]: Uploading ${sortedImages.length} images from folder...`);
         const fileInput = page.locator('input[type="file"]').first();
         await fileInput.waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
         // Sort images so "rendered" or "01_" files come first (per pro-tip: first photo should be the nice digital render)
-        const sortedImages = [...imagePaths].sort();
         await fileInput.setInputFiles(sortedImages);
         await delay(2500); // Give FB time to process and enable the Next button
         sendLog(`[Playwright]: Images uploaded via hidden file input.`);
@@ -495,9 +997,12 @@ async function createFbMarketplaceListing({ title, description, price, imagePath
       await page.keyboard.press('PageDown');
       await delay(800);
 
-      // 3. Bypass broken ARIA roles completely and click the raw text. 
-      // We use a regex that looks for the word "and" since Facebook changed the spelling.
-      await page.getByText(/Toys and games/i).last().click({ force: true });
+      // 3. Bypass broken ARIA roles completely and click the raw text.
+      const categoryRegex = apiKey
+        ? await selectCategoryWithDeepSeek(apiKey, title)
+        : /Toys and games/i;
+      sendLog(`[DeepSeek]: Using category pattern: ${categoryRegex}`);
+      await page.getByText(categoryRegex).last().click({ force: true });
       await delay(1000);
 
       sendLog('[Playwright]: Category locked in successfully.');
@@ -532,12 +1037,12 @@ async function createFbMarketplaceListing({ title, description, price, imagePath
     sendLog('[Playwright]: Clicking Next to advance to the review screen...');
     try {
       // 1. Click Next on the first page
-      await page.getByRole('button', { name: 'Next' }).click();
+      await clickVisibleActionButton(page, 'Next', { timeout: 20000 });
       await delay(3000); // Wait 3 seconds for the review screen to slide in
       
       // 2. Click the final Publish button
       sendLog('[Playwright]: Clicking final Publish button...');
-      await page.getByRole('button', { name: 'Publish' }).click();
+      await clickVisibleActionButton(page, 'Publish', { timeout: 25000 });
       
       // Wait 7 seconds for Facebook to process the upload and route back to the dashboard
       sendLog('[Playwright]: Waiting for Facebook to process the listing...');
@@ -547,24 +1052,12 @@ async function createFbMarketplaceListing({ title, description, price, imagePath
       uploadState.count++;
       sendLog(`[System]: Upload successful. Daily limit tracker: ${uploadState.count}/${MAX_DAILY_UPLOADS}.`);
     } catch (error) {
-      sendLog('[Playwright Error]: Failed in the Publish sequence:', error.message);
+      sendLog(`[Playwright Error]: Failed in the Publish sequence: ${error.message}`);
       throw error; // Throw error so it doesn't get added to processed.json if it fails
     }
 
-    // === ANTI-BAN HUMAN DELAY ===
-    // Calculate a random delay between 3 and 8 minutes
-    const minDelay = 180000; // 3 minutes in milliseconds
-    const maxDelay = 480000; // 8 minutes in milliseconds
-    const waitTimeMs = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
-    const waitTimeMins = (waitTimeMs / 60000).toFixed(2);
-    
-    sendLog(`[System]: Success! Resting for ${waitTimeMins} minutes to emulate human behavior before the next item...`);
-    
-    // Await the randomized delay before the loop continues
-    await new Promise(resolve => setTimeout(resolve, waitTimeMs));
-
-    // Keep a live cookie backup on every successful automation step (your "copy cookies" safety net)
-    exportFBCookies().catch(() => {});
+    // exportFBCookies() was removed as it caused ReferenceErrors
+    // Cookies are stored naturally in the --user-data-dir Chrome profile
 
     // === CDP BEST PRACTICE (fixes the common "kills my Chrome" bug) ===
     // We used connectOverCDP, so we MUST call .disconnect() (not .close()).
@@ -591,6 +1084,18 @@ async function createFbMarketplaceListing({ title, description, price, imagePath
   }
 }
 
+// Dynamic description generator using custom/loaded templates
+function getDescriptionFromTemplate(templatesMap, templateKey, productName) {
+  const tpl = templatesMap[templateKey];
+  if (!tpl || !tpl.text) {
+    return `3D Printed DIY Cosplay Prop Kit - ${productName}`;
+  }
+  // Replace ${name} or ${productName} with the actual product name
+  return tpl.text
+    .replace(/\$\{name\}/g, productName)
+    .replace(/\$\{productName\}/g, productName);
+}
+
 // Main orchestration for a single item (used by both full run and single-item button)
 async function processOneItem(item, uploadState = { count: 0 }, MAX_DAILY_UPLOADS = 15) {
   item.status = 'Processing';
@@ -599,50 +1104,51 @@ async function processOneItem(item, uploadState = { count: 0 }, MAX_DAILY_UPLOAD
 
   try {
     // 1. Discover images
+    await ensureImagesExtracted(item.fullPath);
     const imagePaths = await getImagesInFolder(item.fullPath);
     sendLog(`[Scanner]: Found ${imagePaths.length} image(s) in folder.`);
 
-    // Vision Auto-Identification for generic folders
-    let productName = item.name;
+    // 1. Load settings once for all DeepSeek features in this item's run
+    const settings = await loadSettings();
+    const deepseekKey = settings.deepseekApiKey || null;
 
-    if (item.name.toLowerCase().startsWith('item_') && imagePaths.length > 0) {
-      sendLog(`[System]: Generic folder ${item.name} detected, running vision auto-identification...`);
-      try {
-        const safeImagePath = imagePaths[0].replace(/\\/g, '\\\\');
-        const command = `powershell.exe -ExecutionPolicy Bypass -Command ". \\$PROFILE; grok -p 'Look at the image located at ${safeImagePath}. Identify the specific cosplay helmet or prop shown. CONTEXT HINT: This is a 3D printable model designed by Yosh Studios. Reply ONLY with the character and item name in 5 words or less. No markdown, no parentheses, no explanations.' "`;
-        
-        const { stdout } = await execPromise(command);
-        
-        // Clean the output: remove newlines, carriage returns, asterisks, and quotes
-        let cleanName = stdout.replace(/[\r\n*`"']/g, ' ').trim();
-        
-        // Collapse multiple spaces into a single space
-        cleanName = cleanName.replace(/\s{2,}/g, ' ');
-        
-        // Hard truncate to 60 characters to ensure Facebook Title limits are respected
-        if (cleanName.length > 60) {
-          cleanName = cleanName.substring(0, 60).trim();
+    // AI Title Generation
+    let productName = item.name;
+    if (deepseekKey) {
+      productName = await generateTitleWithDeepSeek(deepseekKey, item.name);
+    }
+
+    // 2. Description generation (pre-generated, templates, or DeepSeek)
+    let description;
+    if (item.generatedDescription) {
+      description = item.generatedDescription;
+      sendLog(`[System]: Using pre-generated DeepSeek description for "${item.name}".`);
+    } else {
+      const template = item.template || 'universal';
+      if (template !== 'deepseek') {
+        const templatesMap = await loadTemplatesInternal();
+        description = getDescriptionFromTemplate(templatesMap, template, productName);
+        sendLog(`[System]: Generated description using template "${template}".`);
+      } else {
+        if (deepseekKey) {
+          description = await generateDescriptionWithDeepSeek(deepseekKey, productName);
+        } else {
+          sendLog(`[System Warning]: No DeepSeek API key set. Using template fallback.`);
+          const templatesMap = await loadTemplatesInternal();
+          description = getDescriptionFromTemplate(templatesMap, 'universal', productName);
         }
-        
-        if (cleanName && !cleanName.toLowerCase().includes('not recognized')) {
-          productName = cleanName;
-          sendLog(`[System]: Identified generic folder ${item.name} as "${productName}".`);
-        }
-      } catch (error) {
-        sendLog(`[System]: Vision CLI error — ${error.message}. Falling back to folder name.`);
       }
     }
 
-    // 2. Grok description (streams live) - use productName for content
-    const description = await generateDescriptionWithGrok(productName);
-
-    // 3. Playwright CDP posting flow - use productName for title/desc, folderName for paths (already in imagePaths)
+    // 3. Playwright CDP posting flow - use custom price if specified
+    const priceToUse = (item.price != null) ? item.price : defaultPrice;
     const result = await createFbMarketplaceListing({
       title: productName,
       description,
-      price: defaultPrice,
+      price: priceToUse,
       imagePaths,
       titleTemplate: defaultTitleTemplate,
+      apiKey: deepseekKey,
       uploadState,
       MAX_DAILY_UPLOADS
     });
@@ -698,25 +1204,27 @@ async function runAutomationLoop() {
     if (!isAutomationRunning) break;
 
     try {
-      await processOneItem(item, uploadState, MAX_DAILY_UPLOADS);
+      const ok = await processOneItem(item, uploadState, MAX_DAILY_UPLOADS);
+      if (ok && item !== itemsToProcess[itemsToProcess.length - 1] && isAutomationRunning) {
+        const waitTimeMs = Math.floor(Math.random() * (CONFIG.MAX_POST_DELAY_MS - CONFIG.MIN_POST_DELAY_MS + 1)) + CONFIG.MIN_POST_DELAY_MS;
+        const waitTimeMins = (waitTimeMs / 60000).toFixed(2);
+        sendLog(`[System]: Success! Resting for ${waitTimeMins} minutes to emulate human behavior before the next item...`);
+
+        const startTime = Date.now();
+        while (Date.now() - startTime < waitTimeMs && isAutomationRunning) {
+          if (isAutomationPaused) {
+            await delay(250);
+            continue;
+          }
+          await delay(500);
+        }
+      }
     } catch (error) {
       sendLog(`[Playwright Error]: Flow failed for ${item.name}: ${error.message}`);
-      sendLog(`[System]: Asking Grok to diagnose the error...`);
-      
-      try {
-        // Clean the error message for the command line
-        const safeError = error.message.replace(/['"\n\r]/g, ' ').substring(0, 200);
-        
-        const diagnosisCommand = `powershell.exe -ExecutionPolicy Bypass -Command ". \\$PROFILE; grok -p 'My Playwright automation for Facebook Marketplace failed with this error: ${safeError}. In 2 short sentences, explain what likely went wrong.' "`;
-        
-        const { stdout } = await execPromise(diagnosisCommand, { timeout: 20000 });
-        const diagnosis = stdout.trim();
-        
-        sendLog(`[AI Diagnosis]: ${diagnosis}`);
-      } catch (diagError) {
-        sendLog(`[System]: Grok diagnosis unavailable or timed out.`);
+      const diagSettings = await loadSettings().catch(() => ({}));
+      if (diagSettings.deepseekApiKey) {
+        await diagnoseErrorWithDeepSeek(diagSettings.deepseekApiKey, item.name, error.message);
       }
-
       sendLog(`[System]: Safely skipping ${item.name} and moving to the next item to prevent queue freeze.`);
       // Note: Do NOT add to processed.json so it can be retried later.
       continue; // Move to the next item in the for...of loop
@@ -757,24 +1265,50 @@ ipcMain.handle('start-automation', async (event, payload) => {
 
   // Fresh filtered scan so queue reflects processed.json
   const processed = await loadProcessed();
+  const customizations = await loadFolderCustomizations();
   // Re-scan to ensure we have latest image info etc.
   const allSubdirs = (await fs.readdir(targetFolder, { withFileTypes: true }))
     .filter(e => e.isDirectory())
     .map(d => d.name);
 
   currentQueue = [];
+  const itemsLookup = {};
+  if (payload && Array.isArray(payload.items)) {
+    payload.items.forEach(i => {
+      itemsLookup[i.name] = i;
+    });
+  }
+
   for (const name of allSubdirs) {
-    if (processed.includes(name)) continue;
+    const isProcessed = processed.includes(name);
     const fullPath = path.join(targetFolder, name);
+    await ensureImagesExtracted(fullPath);
     const thumb = await findFirstImage(fullPath);
-    currentQueue.push({ name, fullPath, status: 'Pending', thumb });
+
+    const lookup = itemsLookup[name];
+    const custom = customizations[name] || {};
+    const itemPrice = (lookup && lookup.price != null) ? lookup.price : (custom.price != null ? custom.price : defaultPrice);
+    const itemTemplate = (lookup && lookup.template) ? lookup.template : (custom.template ? custom.template : 'universal');
+
+    const images = await getImagesInFolder(fullPath);
+    const validity = getFolderValidity(name, images.length);
+
+    currentQueue.push({
+      name,
+      fullPath,
+      status: isProcessed ? 'Done' : validity.status,
+      errorReason: isProcessed ? null : validity.reason,
+      thumb,
+      price: itemPrice,
+      template: itemTemplate
+    });
   }
 
   sendQueueUpdate();
 
-  const pendingCount = currentQueue.length;
+  const pendingCount = currentQueue.filter(i => i.status === 'Pending').length;
   if (pendingCount === 0) {
-    sendLog('[System]: No pending items after processed.json filter.');
+    sendLog('[System]: No pending items to process.');
     return { success: false };
   }
 
@@ -802,6 +1336,14 @@ ipcMain.handle('pause-automation', async () => {
   return { paused: isAutomationPaused };
 });
 
+ipcMain.handle('stop-automation', async () => {
+  isAutomationRunning = false;
+  isAutomationPaused = false;
+  sendStatusUpdate();
+  sendLog('[System]: Automation stopped by user.');
+  return { success: true };
+});
+
 // Single item from the per-row "Process" button
 ipcMain.handle('run-single-item', async (event, payload) => {
   const { folder, defaultPrice: newPrice, titleTemplate: newTitleTemplate } = payload || {};
@@ -823,9 +1365,103 @@ ipcMain.handle('run-single-item', async (event, payload) => {
     return { success: false };
   }
 
+  if (item && payload) {
+    if (payload.price != null) item.price = payload.price;
+    if (payload.template != null) item.template = payload.template;
+  }
+
   sendLog(`[System]: Single-item mode for "${item.name}"`);
   const ok = await processOneItem(item);
   return { success: ok };
+});
+
+ipcMain.handle('mark-item-done', async (event, payload) => {
+  const { index, name } = payload || {};
+  let item = null;
+
+  if (typeof index === 'number' && currentQueue[index]) {
+    item = currentQueue[index];
+  } else if (name) {
+    item = currentQueue.find(queueItem => queueItem.name === name);
+  }
+
+  if (!item) {
+    return { success: false, message: 'Item not found in queue.' };
+  }
+
+  if (item.status === 'Processing') {
+    return { success: false, message: 'Cannot mark an item done while it is processing.' };
+  }
+
+  const processed = await loadProcessed();
+  if (!processed.includes(item.name)) {
+    processed.push(item.name);
+    await saveProcessed(processed);
+  }
+
+  item.status = 'Done';
+  sendQueueUpdate();
+  sendLog(`[System]: "${item.name}" manually marked Done and added to processed.json.`);
+
+  return { success: true, name: item.name };
+});
+
+ipcMain.handle('republish-item', async (event, payload) => {
+  const { name } = payload || {};
+  if (!name) return { success: false, message: 'No item name provided' };
+
+  // 1. Remove from processed.json
+  const processed = await loadProcessed();
+  const idx = processed.indexOf(name);
+  if (idx !== -1) {
+    processed.splice(idx, 1);
+    await saveProcessed(processed);
+  }
+
+  // 2. Find it in currentQueue
+  let item = currentQueue.find(i => i.name === name);
+  if (!item && targetFolder) {
+    const fullPath = path.join(targetFolder, name);
+    await ensureImagesExtracted(fullPath);
+    const thumb = await findFirstImage(fullPath);
+    const images = await getImagesInFolder(fullPath);
+    const validity = getFolderValidity(name, images.length);
+    const customizations = await loadFolderCustomizations();
+    const custom = customizations[name] || {};
+    item = {
+      name,
+      fullPath,
+      status: validity.status,
+      errorReason: validity.reason,
+      thumb,
+      price: custom.price,
+      template: custom.template
+    };
+    currentQueue.push(item);
+  }
+
+  if (item) {
+    // Reset status to Pending (or Review if invalid)
+    const images = await getImagesInFolder(item.fullPath);
+    const validity = getFolderValidity(item.name, images.length);
+    item.status = validity.status;
+    item.errorReason = validity.reason;
+    sendQueueUpdate();
+
+    if (item.status === 'Pending') {
+      sendLog(`[System]: Republishing "${name}"...`);
+      // Start in background
+      processOneItem(item).catch(err => {
+        sendLog(`[Error]: Republish failed for "${name}" - ${err.message}`);
+      });
+      return { success: true, status: 'Processing' };
+    } else {
+      sendLog(`[System]: "${name}" moved back to pending but requires review: ${item.errorReason}`);
+      return { success: true, status: 'Review' };
+    }
+  }
+
+  return { success: false, message: 'Item not found on disk' };
 });
 
 ipcMain.handle('set-default-price', (event, price) => {
@@ -866,52 +1502,112 @@ function findChromeExecutable() {
 
 function killBotChrome() {
   if (process.platform !== 'win32') return;
-  try {
-    const ps = `
+  const ps = `
 $profile = "C:\\chrome-automation-profile"
 $port = 9222
-Get-Process chrome -ErrorAction SilentlyContinue | ForEach-Object {
-  try {
-    $cmd = (Get-CimInstance Win32_Process -Filter "ProcessId = $($_.Id)" -ErrorAction SilentlyContinue).CommandLine
-    if ($cmd -and ($cmd -like "*$profile*" -or $cmd -like "*remote-debugging-port=$port*")) {
-      Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
-    }
-  } catch {}
+Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" -ErrorAction SilentlyContinue | ForEach-Object {
+  if ($_.CommandLine -and ($_.CommandLine -like "*$profile*" -or $_.CommandLine -like "*remote-debugging-port=$port*")) {
+    Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+  }
 }
 `;
-    require('child_process').execSync(`powershell -Command "${ps}"`, { windowsHide: true });
-  } catch (e) {
-    // ignore
-  }
+  runPowerShell(ps);
 }
 
 function bringChromeToFront() {
   if (process.platform !== 'win32') return;
   const script = `
 $profile = "C:\\chrome-automation-profile"
-for ($i=0; $i -lt 5; $i++) {
-  Get-Process chrome -ErrorAction SilentlyContinue | ForEach-Object {
-    try {
-      $cmd = (Get-CimInstance Win32_Process -Filter "ProcessId = $($_.Id)" -ErrorAction SilentlyContinue).CommandLine
-      if ($cmd -and ($cmd -like "*$profile*")) {
-        $hwnd = $_.MainWindowHandle
-        if ($hwnd -ne 0) {
-          Add-Type -Name Win32 -Namespace Win32 -MemberDefinition @"
+$processes = Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like "*$profile*" }
+if ($processes) {
+  Add-Type -Name Win32 -Namespace Win32 -MemberDefinition @"
 [DllImport("user32.dll")]
 public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 [DllImport("user32.dll")]
 public static extern bool SetForegroundWindow(IntPtr hWnd);
 "@
-          [Win32.Win32]::ShowWindow($hwnd, 9)  # SW_RESTORE
-          [Win32.Win32]::SetForegroundWindow($hwnd)
-        }
+  for ($i=0; $i -lt 5; $i++) {
+    foreach ($proc in $processes) {
+      $p = Get-Process -Id $proc.ProcessId -ErrorAction SilentlyContinue
+      if ($p -and $p.MainWindowHandle -ne 0) {
+        [Win32.Win32]::ShowWindow($p.MainWindowHandle, 9) | Out-Null
+        [Win32.Win32]::SetForegroundWindow($p.MainWindowHandle) | Out-Null
       }
-    } catch {}
+    }
+    Start-Sleep -Milliseconds 300
   }
-  Start-Sleep -Milliseconds 300
 }
 `;
   runPowerShell(script);
+}
+
+function setChromeWindowVisible(visible) {
+  chromeVisible = visible;
+  if (process.platform !== 'win32') return;
+
+  const nCmdShow = visible ? 9 : 0; // SW_RESTORE : SW_HIDE
+  const script = `
+$code = @'
+using System;
+using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.Text;
+
+public class WindowHelper {
+    [DllImport("user32.dll")]
+    public static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
+    
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+    
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+    
+    [DllImport("user32.dll")]
+    public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    public static List<IntPtr> GetProcessWindows(int processId) {
+        List<IntPtr> windows = new List<IntPtr>();
+        EnumWindows(delegate(IntPtr hWnd, IntPtr lParam) {
+            uint pid;
+            GetWindowThreadProcessId(hWnd, out pid);
+            if (pid == processId) {
+                StringBuilder className = new StringBuilder(256);
+                GetClassName(hWnd, className, className.Capacity);
+                if (className.ToString() == "Chrome_WidgetWin_1") {
+                    windows.Add(hWnd);
+                }
+            }
+            return true;
+        }, IntPtr.Zero);
+        return windows;
+    }
+}
+'@
+
+Add-Type -TypeDefinition $code -ErrorAction SilentlyContinue
+
+$profile = "C:\\chrome-automation-profile"
+Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" -ErrorAction SilentlyContinue | ForEach-Object {
+  if ($_.CommandLine -and ($_.CommandLine -like "*$profile*")) {
+    [WindowHelper]::GetProcessWindows($_.ProcessId) | ForEach-Object {
+      [WindowHelper]::ShowWindow($_, ${nCmdShow}) | Out-Null
+      if (${visible ? '$true' : '$false'}) {
+        [WindowHelper]::SetForegroundWindow($_) | Out-Null
+      }
+    }
+  }
+}
+`;
+
+  try {
+    runPowerShell(script);
+  } catch (_) {}
 }
 
 async function launchAutomationChrome(visible = chromeVisible) {
@@ -1017,23 +1713,103 @@ async function launchAutomationChrome(visible = chromeVisible) {
   }
 }
 
+let terminalWindowHandle = null;
+
+function getTerminalWindowHandle() {
+  if (terminalWindowHandle !== null) return terminalWindowHandle;
+  if (process.platform !== 'win32') return null;
+
+  const rootPid = process.pid;
+  const script = `
+$code = @'
+using System;
+using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.Text;
+
+public class ConsoleFinder {
+    [DllImport("user32.dll")]
+    public static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
+    
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+    
+    [DllImport("user32.dll")]
+    public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    public static List<IntPtr> GetProcessConsoleWindows(List<int> pids) {
+        List<IntPtr> windows = new List<IntPtr>();
+        EnumWindows(delegate(IntPtr hWnd, IntPtr lParam) {
+            uint pid;
+            GetWindowThreadProcessId(hWnd, out pid);
+            if (pids.Contains((int)pid)) {
+                StringBuilder className = new StringBuilder(256);
+                GetClassName(hWnd, className, className.Capacity);
+                string cls = className.ToString();
+                if (cls == "ConsoleWindowClass" || cls == "CASCADIA_HOSTING_WINDOW_CLASS") {
+                    windows.Add(hWnd);
+                }
+            }
+            return true;
+        }, IntPtr.Zero);
+        return windows;
+    }
+}
+'@
+
+Add-Type -TypeDefinition $code -ErrorAction SilentlyContinue
+
+$pidsList = New-Object System.Collections.Generic.List[int]
+$pidToCheck = ${rootPid}
+$visited = @{}
+for ($i = 0; $i -lt 8 -and $pidToCheck -and -not $visited.ContainsKey($pidToCheck); $i++) {
+  $visited[$pidToCheck] = $true
+  $pidsList.Add($pidToCheck)
+  $wmi = Get-CimInstance Win32_Process -Filter "ProcessId = $pidToCheck" -ErrorAction SilentlyContinue
+  if (-not $wmi) { break }
+  $pidToCheck = $wmi.ParentProcessId
+}
+
+$wins = [ConsoleFinder]::GetProcessConsoleWindows($pidsList)
+if ($wins.Count -gt 0) {
+  Write-Output $wins[0]
+}
+`;
+
+  try {
+    const tmpFile = path.join(os.tmpdir(), `fb-auto-find-${Date.now()}.ps1`);
+    fsSync.writeFileSync(tmpFile, script, 'utf8');
+    const stdout = execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${tmpFile}"`, { windowsHide: true });
+    try { fsSync.unlinkSync(tmpFile); } catch (_) {}
+    const handleStr = stdout.toString().trim();
+    if (handleStr) {
+      terminalWindowHandle = parseInt(handleStr, 10);
+      return terminalWindowHandle;
+    }
+  } catch (e) {
+    // ignore
+  }
+  return null;
+}
+
 function setTerminalVisible(visible) {
   terminalVisible = visible;
   if (process.platform !== 'win32') return;
-  const nCmdShow = visible ? 5 : 0; // SW_SHOW : SW_HIDE
-  const script = `
-Add-Type -Name Win32ShowWindow -Namespace Win32 -MemberDefinition @"
-[DllImport("kernel32.dll")]
-public static extern IntPtr GetConsoleWindow();
+
+  const handle = getTerminalWindowHandle();
+  if (handle) {
+    const nCmdShow = visible ? 5 : 0; // SW_SHOW : SW_HIDE
+    const script = `
+Add-Type -Name Win32ShowConsole -Namespace Win32 -MemberDefinition @"
 [DllImport("user32.dll")]
 public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 "@
-$hWnd = [Win32.Win32ShowWindow]::GetConsoleWindow()
-if ($hWnd -ne [IntPtr]::Zero) {
-  [Win32.Win32ShowWindow]::ShowWindow($hWnd, ${nCmdShow}) | Out-Null
-}
-  `;
-  runPowerShell(script);
+[Win32.Win32ShowConsole]::ShowWindow([IntPtr]${handle}, ${nCmdShow}) | Out-Null
+`;
+    runPowerShell(script);
+  }
 }
 
 // Force close the terminal/console window hosting this app (if any).
@@ -1042,20 +1818,17 @@ if ($hWnd -ne [IntPtr]::Zero) {
 // This cleanly closes the cmd/pwsh window even if it was visible or hidden.
 function forceCloseTerminal() {
   if (process.platform !== 'win32') return;
-  const script = `
+  const handle = getTerminalWindowHandle();
+  if (handle) {
+    const script = `
 Add-Type -Name Win32CloseConsole -Namespace Win32 -MemberDefinition @"
-[DllImport("kernel32.dll")]
-public static extern IntPtr GetConsoleWindow();
 [DllImport("user32.dll")]
 public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 "@
-$hWnd = [Win32.Win32CloseConsole]::GetConsoleWindow()
-if ($hWnd -ne [IntPtr]::Zero) {
-  [Win32.Win32CloseConsole]::PostMessage($hWnd, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
-  Start-Sleep -Milliseconds 150
-}
-  `;
-  runPowerShell(script);
+[Win32.Win32CloseConsole]::PostMessage([IntPtr]${handle}, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
+`;
+    runPowerShell(script);
+  }
 }
 
 ipcMain.handle('toggle-chrome-visibility', async () => {
@@ -1239,6 +2012,16 @@ ipcMain.handle('open-automation-profile', openAutomationProfileFolder);
 ipcMain.handle('export-fb-cookies', exportFBCookies);
 ipcMain.handle('import-fb-cookies', importFBCookies);
 
+ipcMain.handle('restart-chrome', async (event, isVisible) => {
+  const running = await isCdpAvailable();
+  if (!running) {
+    await launchAutomationChrome(isVisible);
+  } else {
+    setChromeWindowVisible(isVisible);
+  }
+  return chromeVisible;
+});
+
 // ==================== Debug Browser (Playwright) - separate "Launch" button for visible browser (different from CDP automation) ====================
 async function launchDebugBrowser() {
   if (debugBrowser) {
@@ -1292,6 +2075,159 @@ async function closeDebugBrowser() {
 ipcMain.handle('launch-debug-browser', launchDebugBrowser);
 ipcMain.handle('close-debug-browser', closeDebugBrowser);
 
+ipcMain.handle('load-templates', async () => {
+  return await loadTemplatesInternal();
+});
+ipcMain.handle('save-templates', async (event, templates) => {
+  return await saveTemplatesInternal(templates);
+});
+ipcMain.handle('rename-folder', async (event, payload) => {
+  const { parentPath, oldName, newName } = payload || {};
+  if (!parentPath || !oldName || !newName) {
+    return { success: false, message: 'Invalid arguments' };
+  }
+  
+  const oldPath = path.join(parentPath, oldName);
+  const newPath = path.join(parentPath, newName);
+  
+  try {
+    try {
+      await fs.access(newPath);
+      return { success: false, message: `Folder "${newName}" already exists.` };
+    } catch (_) {}
+    
+    await fs.rename(oldPath, newPath);
+    
+    // Also sync processed.json if the old folder was processed
+    const processed = await loadProcessed();
+    const idx = processed.indexOf(oldName);
+    if (idx !== -1) {
+      if (!processed.includes(newName)) {
+        processed[idx] = newName;
+      } else {
+        processed.splice(idx, 1);
+      }
+      await saveProcessed(processed);
+    }
+
+    // Also sync folder customizations if any
+    const customizations = await loadFolderCustomizations();
+    if (customizations[oldName]) {
+      customizations[newName] = customizations[oldName];
+      delete customizations[oldName];
+      await saveFolderCustomizations(customizations);
+    }
+    
+    sendLog(`[System]: Folder renamed on disk from "${oldName}" to "${newName}"`);
+    return { success: true };
+  } catch (err) {
+    sendLog(`[Error]: Failed to rename folder - ${err.message}`);
+    return { success: false, message: err.message };
+  }
+});
+
+ipcMain.handle('open-folder', async (event, folderPath) => {
+  if (!folderPath) return false;
+  try {
+    await shell.openPath(folderPath);
+    return true;
+  } catch (err) {
+    sendLog(`[Error]: Failed to open folder - ${err.message}`);
+    return false;
+  }
+});
+
+ipcMain.handle('save-folder-customization', async (event, payload) => {
+  const { folderName, price, template } = payload || {};
+  if (!folderName) return false;
+  const customizations = await loadFolderCustomizations();
+  customizations[folderName] = { price, template };
+  return await saveFolderCustomizations(customizations);
+});
+
+// DeepSeek settings and verification
+ipcMain.handle('validate-deepseek-key', async (event, key) => {
+  if (!key) {
+    return { success: false, message: 'API key is empty.' };
+  }
+  sendLog(`[DeepSeek]: Validating API key...`);
+  try {
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'deepseek-v4-flash',
+        messages: [{ role: 'user', content: 'Ping' }],
+        max_tokens: 5
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      return { success: false, message: `Validation failed (HTTP ${response.status})` };
+    }
+
+    const data = await response.json();
+    if (data.choices && data.choices[0]) {
+      const settings = await loadSettings();
+      settings.deepseekApiKey = key;
+      await saveSettings(settings);
+      sendLog(`[DeepSeek]: API Key verified successfully. Saved to settings.`);
+      return { success: true };
+    } else {
+      return { success: false, message: 'Invalid response from API.' };
+    }
+  } catch (err) {
+    sendLog(`[DeepSeek Validation Error]: ${err.message}`);
+    return { success: false, message: err.message };
+  }
+});
+
+ipcMain.handle('get-deepseek-key', async () => {
+  try {
+    const settings = await loadSettings();
+    return settings.deepseekApiKey || '';
+  } catch (_) {
+    return '';
+  }
+});
+
+ipcMain.handle('bulk-deepseek-rewrite', async (event, itemNames) => {
+  const settings = await loadSettings();
+  if (!settings.deepseekApiKey) return { success: false, message: 'No DeepSeek API key set.' };
+  const results = {};
+  for (const name of itemNames) {
+    results[name] = await generateDescriptionWithDeepSeek(settings.deepseekApiKey, name);
+  }
+  return { success: true, results };
+});
+
+ipcMain.handle('save-uploaded-images', async (event, { folderPath, images }) => {
+  if (!folderPath || !images || !images.length) {
+    return { success: false, message: 'Missing parameters.' };
+  }
+  try {
+    sendLog(`[System]: Saving ${images.length} uploaded images to folder: "${path.basename(folderPath)}"...`);
+    await fs.mkdir(folderPath, { recursive: true });
+    for (const img of images) {
+      const base64Data = img.base64.replace(/^data:image\/\w+;base64,/, "");
+      const buffer = Buffer.from(base64Data, 'base64');
+      const targetPath = path.join(folderPath, img.name);
+      await fs.writeFile(targetPath, buffer);
+      sendLog(`[Scanner]: Saved uploaded image: "${img.name}"`);
+    }
+    return { success: true };
+  } catch (err) {
+    sendLog(`[Error]: Failed to save uploaded images - ${err.message}`);
+    return { success: false, message: err.message };
+  }
+});
+
+
+
 // ==================== Window Controls (Frameless) ====================
 ipcMain.on('window-minimize', () => {
   if (mainWindow) mainWindow.minimize();
@@ -1343,54 +2279,6 @@ app.on('before-quit', async () => {
 app.whenReady().then(() => {
   // Direct main window (rollback to earlier simple visible state, no startup dialog).
   createWindow();
-
-  // Initialize system tray
-  const iconPath = path.join(__dirname, 'icon.png');
-  try {
-    if (require('fs').existsSync(iconPath)) {
-      tray = new Tray(iconPath);
-    } else {
-      console.error(`[Tray] icon.png not found at ${iconPath}. Tray not created.`);
-      tray = null;
-    }
-  } catch (e) {
-    console.error('[Tray] Failed to create tray icon:', e.message);
-    tray = null;
-  }
-
-  if (tray) {
-    const contextMenu = Menu.buildFromTemplate([
-      {
-        label: 'Show Dashboard',
-        click: () => {
-          if (mainWindow) {
-            mainWindow.show();
-            mainWindow.focus();
-          }
-        }
-      },
-      {
-        label: 'Quit Automation',
-        click: () => {
-          isQuitting = true;
-          killBotChrome();
-          forceCloseTerminal();
-          if (mainWindow) mainWindow.destroy();
-          app.quit();
-        }
-      }
-    ]);
-
-    tray.setToolTip('Marketplace Automation Studio');
-    tray.setContextMenu(contextMenu);
-
-    tray.on('double-click', () => {
-      if (mainWindow) {
-        mainWindow.show();
-        mainWindow.focus();
-      }
-    });
-  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
