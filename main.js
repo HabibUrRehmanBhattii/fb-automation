@@ -1651,39 +1651,35 @@ async function launchAutomationChrome(visible = chromeVisible) {
   sendBrowserStatus('connecting');
 
   try {
-    // Use shell-based exec to launch Chrome, matching the working PS1 Start-Process approach.
-    // Node's spawn with detached:true causes a white/unresponsive window on some Windows systems
-    // because Chrome's GPU process cannot properly initialize outside a shell context.
-    const args = [
-      `--remote-debugging-port=${debugPort}`,
-      `--user-data-dir="${userDataDir}"`,
-      '--no-first-run',
-      '--no-default-browser-check'
-    ];
-    if (!visible) {
-      args.push('--headless=new', '--start-minimized');
-    } else {
-      args.push('--start-maximized');
-    }
-    const cmd = `"${chromePath}" ${args.join(' ')}`;
-    sendLog(`[System]: Running: ${cmd}`);
+    // Use spawn with shell:true to launch Chrome — this is the Node.js equivalent of
+    // PowerShell's Start-Process (which the working start-debug.ps1 uses). The shell
+    // (cmd.exe) resolves paths and sets up the console/window environment properly.
+    // Without shell:true, Chrome's GPU process fails to initialize → white window.
+    // Without detached + unref, Chrome dies when Electron exits.
+    // We use stdio:'ignore' to avoid buffer limits (unlike exec which can kill Chrome
+    // if its output exceeds the 200KB default buffer, especially in packaged builds).
+    const shellCmd = `"${chromePath}" --remote-debugging-port=${debugPort} --user-data-dir="${userDataDir}" --no-first-run --no-default-browser-check --no-sandbox${visible ? ' --start-maximized' : ' --headless=new --start-minimized'}`;
+    sendLog(`[System]: Shell launching: ${shellCmd}`);
 
-    // Fire-and-forget via shell — Chrome runs independently from Electron.
-    // If Electron closes, Chrome stays alive (same behavior as Start-Process in PS1).
-    execPromise(cmd, { windowsHide: !visible }).catch(() => {
-      // exec may reject if Chrome takes too long; that's fine — it's still running
+    const child = spawn(shellCmd, [], {
+      shell: true,
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: !visible
     });
+
+    child.unref();
 
     // For visible mode, bring the window to front as soon as possible (don't wait for full CDP)
     if (visible) {
-      await delay(1500);
+      await delay(2500);
       bringChromeToFront();
-      await delay(800);
+      await delay(1000);
       bringChromeToFront();
     }
 
     // Give Chrome a moment to start the debug server (for CDP / automation)
-    await delay(visible ? 1500 : 2500);
+    await delay(visible ? 1000 : 2000);
 
     // Quick probe
     const ready = await isCdpAvailable();
