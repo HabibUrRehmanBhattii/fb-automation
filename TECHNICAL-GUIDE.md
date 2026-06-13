@@ -749,4 +749,4 @@ await page.getByText(/your category/i).last().click({ force: true });
 
 ---
 
-*Last updated: June 12, 2026. Built by Yosh Studios.*
+*Last updated: June 12, 2026. Built by Yosh Studios Fan.*
