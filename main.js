@@ -1662,7 +1662,7 @@ async function launchAutomationChrome(visible = chromeVisible) {
       args.push('--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage', '--start-minimized');
     } else {
       // For visible: make sure the window actually appears maximized and is brought to front
-      args.push('--start-maximized');
+      args.push('--start-maximized', '--no-sandbox', '--disable-gpu');
     }
     const child = spawn(chromePath, args, {
       detached: true,
