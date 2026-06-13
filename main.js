@@ -1651,37 +1651,39 @@ async function launchAutomationChrome(visible = chromeVisible) {
   sendBrowserStatus('connecting');
 
   try {
-    // Fire and forget (do not wait for exit). Use shell:false and detached for cleanliness on Windows.
+    // Use shell-based exec to launch Chrome, matching the working PS1 Start-Process approach.
+    // Node's spawn with detached:true causes a white/unresponsive window on some Windows systems
+    // because Chrome's GPU process cannot properly initialize outside a shell context.
     const args = [
       `--remote-debugging-port=${debugPort}`,
-      `--user-data-dir=${userDataDir}`,
+      `--user-data-dir="${userDataDir}"`,
       '--no-first-run',
       '--no-default-browser-check'
     ];
     if (!visible) {
-      args.push('--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage', '--start-minimized');
+      args.push('--headless=new', '--start-minimized');
     } else {
-      // For visible: make sure the window actually appears maximized and is brought to front
-      args.push('--start-maximized', '--no-sandbox', '--disable-gpu');
+      args.push('--start-maximized');
     }
-    const child = spawn(chromePath, args, {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: !visible   // when user chose Visible, do not hide the subprocess window
-    });
+    const cmd = `"${chromePath}" ${args.join(' ')}`;
+    sendLog(`[System]: Running: ${cmd}`);
 
-    child.unref();
+    // Fire-and-forget via shell — Chrome runs independently from Electron.
+    // If Electron closes, Chrome stays alive (same behavior as Start-Process in PS1).
+    execPromise(cmd, { windowsHide: !visible }).catch(() => {
+      // exec may reject if Chrome takes too long; that's fine — it's still running
+    });
 
     // For visible mode, bring the window to front as soon as possible (don't wait for full CDP)
     if (visible) {
-      await delay(800);
+      await delay(1500);
       bringChromeToFront();
-      await delay(300);
+      await delay(800);
       bringChromeToFront();
     }
 
     // Give Chrome a moment to start the debug server (for CDP / automation)
-    await delay(visible ? 1200 : 2200);
+    await delay(visible ? 1500 : 2500);
 
     // Quick probe
     const ready = await isCdpAvailable();
@@ -2013,12 +2015,11 @@ ipcMain.handle('export-fb-cookies', exportFBCookies);
 ipcMain.handle('import-fb-cookies', importFBCookies);
 
 ipcMain.handle('restart-chrome', async (event, isVisible) => {
-  const running = await isCdpAvailable();
-  if (!running) {
-    await launchAutomationChrome(isVisible);
-  } else {
-    setChromeWindowVisible(isVisible);
-  }
+  // Always kill and relaunch when toggling — you can't make a headless Chrome visible
+  // or vice versa without fully restarting the process.
+  killBotChrome();
+  await delay(600);
+  await launchAutomationChrome(isVisible);
   return chromeVisible;
 });
 
@@ -2276,9 +2277,15 @@ app.on('before-quit', async () => {
   }
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Direct main window (rollback to earlier simple visible state, no startup dialog).
   createWindow();
+
+  // Auto-launch the dedicated automation Chrome on startup (visible, with persistent profile).
+  // This means the user never needs to manually launch Chrome — just log into FB once in it.
+  sendLog('[System]: Auto-launching automation Chrome on startup...');
+  await delay(500);
+  launchAutomationChrome(true);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
